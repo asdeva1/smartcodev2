@@ -100,71 +100,71 @@ erDiagram
 
 ### Organization & people
 
-| Table | Purpose | Key constraints |
-|---|---|---|
-| `organizations` | SmartClues (single row in V1). Holds name, time zone, branding settings. | — |
-| `employees` | **Employee Directory — single source of truth** for every person (in-house and vendor). No password column. | `UNIQUE(organization_id, employee_code)`, `UNIQUE(lower(email))`, `CHECK` vendor roles: `role='VENDOR_ADMIN' ⇒ vendor_id IS NOT NULL` |
-| `credentials` | Argon2id password hash, `password_changed_at`, failed-attempt counter, `locked_until`. 1:1 with employee; absent until activation. | `UNIQUE(employee_id)` |
-| `auth_tokens` | Activation and password-reset tokens. Stores **SHA-256 hash only**, `type`, `expires_at`, `used_at`, `revoked_at`, `issued_by_id`. | Partial `UNIQUE(employee_id, type) WHERE used_at IS NULL AND revoked_at IS NULL` (only one live token per type) |
-| `sessions` | Refresh-token sessions: token hash, family ID (rotation/reuse detection), IP, user agent, `expires_at`, `revoked_at`. | `UNIQUE(token_hash)` |
-| `vendors` | Vendor companies. Status ACTIVE/INACTIVE. (User-facing terminology such as **SPC** comes from a terminology map, not table names — D-16.) | `UNIQUE(organization_id, lower(name))`, `UNIQUE(code)` |
-| `teams` | Teams, in-house (`vendor_id` null) or vendor-owned. `team_lead_id`. | `UNIQUE(organization_id, vendor_id, lower(name))`; TL must belong to same vendor scope (service + trigger check) |
-| `team_memberships` | Append-only membership history. | Partial `UNIQUE(employee_id) WHERE ended_at IS NULL` (one current team) |
+| Table              | Purpose                                                                                                                                   | Key constraints                                                                                                                       |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `organizations`    | SmartClues (single row in V1). Holds name, time zone, branding settings.                                                                  | —                                                                                                                                     |
+| `employees`        | **Employee Directory — single source of truth** for every person (in-house and vendor). No password column.                               | `UNIQUE(organization_id, employee_code)`, `UNIQUE(lower(email))`, `CHECK` vendor roles: `role='VENDOR_ADMIN' ⇒ vendor_id IS NOT NULL` |
+| `credentials`      | Argon2id password hash, `password_changed_at`, failed-attempt counter, `locked_until`. 1:1 with employee; absent until activation.        | `UNIQUE(employee_id)`                                                                                                                 |
+| `auth_tokens`      | Activation and password-reset tokens. Stores **SHA-256 hash only**, `type`, `expires_at`, `used_at`, `revoked_at`, `issued_by_id`.        | Partial `UNIQUE(employee_id, type) WHERE used_at IS NULL AND revoked_at IS NULL` (only one live token per type)                       |
+| `sessions`         | Refresh-token sessions: token hash, family ID (rotation/reuse detection), IP, user agent, `expires_at`, `revoked_at`.                     | `UNIQUE(token_hash)`                                                                                                                  |
+| `vendors`          | Vendor companies. Status ACTIVE/INACTIVE. (User-facing terminology such as **SPC** comes from a terminology map, not table names — D-16.) | `UNIQUE(organization_id, lower(name))`, `UNIQUE(code)`                                                                                |
+| `teams`            | Teams, in-house (`vendor_id` null) or vendor-owned. `team_lead_id`.                                                                       | `UNIQUE(organization_id, vendor_id, lower(name))`; TL must belong to same vendor scope (service + trigger check)                      |
+| `team_memberships` | Append-only membership history.                                                                                                           | Partial `UNIQUE(employee_id) WHERE ended_at IS NULL` (one current team)                                                               |
 
 ### SmartClues Login Names
 
-| Table | Purpose | Key constraints |
-|---|---|---|
-| `login_names` | Internal SmartClues identifiers (value, status). | `UNIQUE(organization_id, lower(value))` |
+| Table                    | Purpose                                                                                                                                                   | Key constraints                                                                                                                                                                                 |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `login_names`            | Internal SmartClues identifiers (value, status).                                                                                                          | `UNIQUE(organization_id, lower(value))`                                                                                                                                                         |
 | `login_name_assignments` | Append-only history: login name ↔ employee, `assigned_by_id`, `assigned_at`, `ended_at`, `end_reason` (`REASSIGNED`, `DEACTIVATED`, `EMPLOYEE_INACTIVE`). | Partial `UNIQUE(login_name_id) WHERE ended_at IS NULL` **and** partial `UNIQUE(employee_id) WHERE ended_at IS NULL` → one active login name per employee and vice versa, enforced by PostgreSQL |
 
 ### Clients, projects, staffing
 
-| Table | Purpose | Key constraints |
-|---|---|---|
-| `clients` | Client name, status. | `UNIQUE(organization_id, lower(name))` |
-| `projects` | `client_id`, name, `allocation_type` (`MANUAL`/`AUTOMATIC`), status. Audit coverage is 100 % in V1 (D-02) — no sampling columns. | `UNIQUE(client_id, lower(name))` |
+| Table                 | Purpose                                                                                                                                          | Key constraints                                                                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `clients`             | Client name, status.                                                                                                                             | `UNIQUE(organization_id, lower(name))`                                                                                                         |
+| `projects`            | `client_id`, name, `allocation_type` (`MANUAL`/`AUTOMATIC`), status. Audit coverage is 100 % in V1 (D-02) — no sampling columns.                 | `UNIQUE(client_id, lower(name))`                                                                                                               |
 | `project_assignments` | Who works on a project: an employee (with project role `TEAM_LEAD`/`AUDITOR`/`CODER`/`GROUP_COACH`) or a whole vendor. Append-only (`ended_at`). | Partial `UNIQUE(project_id, employee_id, project_role) WHERE ended_at IS NULL`; partial `UNIQUE(project_id, vendor_id) WHERE ended_at IS NULL` |
 
 ### Charts, production, audit
 
-| Table | Purpose | Key constraints |
-|---|---|---|
-| `charts` | One row per chart. `chart_ref` = Chart ID from the client file; denormalised tracking columns (`allocated_at`, `coded_at`, `audited_at`, `completed_at`, `status`, `current_assignment_id`) for fast tracking screens; `source_data jsonb` keeps extra CSV columns. | `UNIQUE(project_id, chart_ref)` (D-04); index `(project_id, status)`, `(status, allocated_at)` |
-| `chart_assignments` | **The only allocation mechanism.** Login name + resolved employee, `source` (`MANUAL`/`CSV`/`AUTOMATIC`), who allocated, when, when ended and why. | Partial `UNIQUE(chart_id) WHERE ended_at IS NULL` → **a chart can never be allocated twice** |
-| `chart_status_events` | Append-only status history (`from`, `to`, actor, reason, at). Feeds the chart timeline. | Insert-only trigger |
-| `production_entries` | Coder's work, **versioned**: `version`, `is_current`, coder + login name (from session, never typed), `page_count`, `total_icds`, `total_dos`, `started_at`, `submitted_at`, `active_seconds`, `remarks`, `rework_id`. Submitted versions are immutable. | `UNIQUE(chart_id, version)`; partial `UNIQUE(chart_id) WHERE is_current` |
-| `audit_entries` | One row per audit (re-audits are new rows). Auditor from session; `audit_errors`, `error_exceptions` (two separate columns), `total_errors` (PostgreSQL generated column = sum), `result`, `status`, `is_re_audit`, `cycle`. Immutable after submit. | Partial `UNIQUE(production_entry_id) WHERE status IN ('IN_PROGRESS','REVIEW_REQUIRED')` (one open audit); `CHECK(audit_errors >= 0 AND error_exceptions >= 0)` |
-| `audit_resolutions` | Manager decision on a `REVIEW_REQUIRED` audit: `APPROVED` (→ chart COMPLETED) or `REJECTED` (→ REWORK), mandatory reason on reject. | `UNIQUE(audit_entry_id)`; resolver role checked in service **and** by a DB trigger (`resolved_by` must be an ACTIVE `MANAGER` and not the auditor of that entry) |
-| `reworks` | Rejected audit → rework: assigned coder, status (`OPEN`, `IN_PROGRESS`, `SUBMITTED`, `CLOSED`), corrected production version, cycle number. | Partial `UNIQUE(chart_id) WHERE status <> 'CLOSED'` |
+| Table                 | Purpose                                                                                                                                                                                                                                                             | Key constraints                                                                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `charts`              | One row per chart. `chart_ref` = Chart ID from the client file; denormalised tracking columns (`allocated_at`, `coded_at`, `audited_at`, `completed_at`, `status`, `current_assignment_id`) for fast tracking screens; `source_data jsonb` keeps extra CSV columns. | `UNIQUE(project_id, chart_ref)` (D-04); index `(project_id, status)`, `(status, allocated_at)`                                                                   |
+| `chart_assignments`   | **The only allocation mechanism.** Login name + resolved employee, `source` (`MANUAL`/`CSV`/`AUTOMATIC`), who allocated, when, when ended and why.                                                                                                                  | Partial `UNIQUE(chart_id) WHERE ended_at IS NULL` → **a chart can never be allocated twice**                                                                     |
+| `chart_status_events` | Append-only status history (`from`, `to`, actor, reason, at). Feeds the chart timeline.                                                                                                                                                                             | Insert-only trigger                                                                                                                                              |
+| `production_entries`  | Coder's work, **versioned**: `version`, `is_current`, coder + login name (from session, never typed), `page_count`, `total_icds`, `total_dos`, `started_at`, `submitted_at`, `active_seconds`, `remarks`, `rework_id`. Submitted versions are immutable.            | `UNIQUE(chart_id, version)`; partial `UNIQUE(chart_id) WHERE is_current`                                                                                         |
+| `audit_entries`       | One row per audit (re-audits are new rows). Auditor from session; `audit_errors`, `error_exceptions` (two separate columns), `total_errors` (PostgreSQL generated column = sum), `result`, `status`, `is_re_audit`, `cycle`. Immutable after submit.                | Partial `UNIQUE(production_entry_id) WHERE status IN ('IN_PROGRESS','REVIEW_REQUIRED')` (one open audit); `CHECK(audit_errors >= 0 AND error_exceptions >= 0)`   |
+| `audit_resolutions`   | Manager decision on a `REVIEW_REQUIRED` audit: `APPROVED` (→ chart COMPLETED) or `REJECTED` (→ REWORK), mandatory reason on reject.                                                                                                                                 | `UNIQUE(audit_entry_id)`; resolver role checked in service **and** by a DB trigger (`resolved_by` must be an ACTIVE `MANAGER` and not the auditor of that entry) |
+| `reworks`             | Rejected audit → rework: assigned coder, status (`OPEN`, `IN_PROGRESS`, `SUBMITTED`, `CLOSED`), corrected production version, cycle number.                                                                                                                         | Partial `UNIQUE(chart_id) WHERE status <> 'CLOSED'`                                                                                                              |
 
 ### Imports & files
 
-| Table | Purpose |
-|---|---|
+| Table            | Purpose                                                                                                                                                                                                                                                          |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `import_batches` | Every CSV workflow (`CHART_IMPORT`, `LOGIN_NAME_ASSIGNMENT`, `CHART_ALLOCATION`, `EMPLOYEE_IMPORT`): S3 key, uploaded by, status (`UPLOADED → PARSED → VALIDATED → CONFIRMED → COMMITTED / FAILED / CANCELLED`), counts (total/valid/invalid/duplicate/warning). |
-| `import_rows` | Row number, raw values, normalised values, errors[], warnings[], duplicate flag, resulting entity id. Drives preview and the downloadable error report. |
-| `file_objects` | Metadata for S3 objects (bucket, key, size, checksum, content type, owner, purpose). |
+| `import_rows`    | Row number, raw values, normalised values, errors[], warnings[], duplicate flag, resulting entity id. Drives preview and the downloadable error report.                                                                                                          |
+| `file_objects`   | Metadata for S3 objects (bucket, key, size, checksum, content type, owner, purpose).                                                                                                                                                                             |
 
 ### Workflow, notifications, logs
 
-| Table | Purpose |
-|---|---|
-| `notifications` | In-app notifications (recipient, type, title, link, payload, `read_at`). |
-| `outbox_messages` | Transactional outbox for emails/events (type, payload, status, attempts, `next_attempt_at`). |
+| Table                                  | Purpose                                                                                                                                                                                                                                                                        |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `notifications`                        | In-app notifications (recipient, type, title, link, payload, `read_at`).                                                                                                                                                                                                       |
+| `outbox_messages`                      | Transactional outbox for emails/events (type, payload, status, attempts, `next_attempt_at`).                                                                                                                                                                                   |
 | `approval_requests` / `approval_steps` | **Universal Approval Engine**: request type, subject (`entity_type`, `entity_id`), requested change (jsonb), requester, status; ordered steps with approver role/person and decision. Used e.g. for login-name changes, employee deactivation, project closure (configurable). |
-| `activity_logs` | Human-readable timeline ("Manager X allocated 120 charts to Login Name Y"). |
-| `audit_logs` | Compliance log: actor, action, entity, before/after jsonb, IP, request ID. **Append-only** — `UPDATE`/`DELETE` blocked by trigger and DB role grants. |
+| `activity_logs`                        | Human-readable timeline ("Manager X allocated 120 charts to Login Name Y").                                                                                                                                                                                                    |
+| `audit_logs`                           | Compliance log: actor, action, entity, before/after jsonb, IP, request ID. **Append-only** — `UPDATE`/`DELETE` blocked by trigger and DB role grants.                                                                                                                          |
 
 ### Productivity, settings, later phases
 
-| Table | Purpose |
-|---|---|
-| `cph_formulas` | Versioned CPH definition (D-10) so the formula changes without a code deploy; reports record which version they used. |
-| `settings` | Org-level key/value settings (token lifetimes, working hours, terminology labels such as SPC). |
-| `hr_links` | Reserved for the Smart HRMS adapter (D-09). Identity is matched on **Employee ID**. Not created until the real HRMS API specification is provided. |
-| `visitors` / `visits` | Visitor Management (Phase 12, scope D-07). |
-| `internal_audit_*` | Internal Audit workspace (Phase 12, scope D-07). |
+| Table                 | Purpose                                                                                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cph_formulas`        | Versioned CPH definition (D-10) so the formula changes without a code deploy; reports record which version they used.                              |
+| `settings`            | Org-level key/value settings (token lifetimes, working hours, terminology labels such as SPC).                                                     |
+| `hr_links`            | Reserved for the Smart HRMS adapter (D-09). Identity is matched on **Employee ID**. Not created until the real HRMS API specification is provided. |
+| `visitors` / `visits` | Visitor Management (Phase 12, scope D-07).                                                                                                         |
+| `internal_audit_*`    | Internal Audit workspace (Phase 12, scope D-07).                                                                                                   |
 
 ## 3. Enums
 
@@ -206,9 +206,9 @@ ApprovalStatus       PENDING | APPROVED | REJECTED | CANCELLED
 4. Chart ID unique within its project.
 5. One current production version per chart; one open audit per production version; one open rework per chart.
 6. Audit resolution only by an active Manager who is not the auditor (trigger) and only once per audit.
-9. `total_errors` is a generated column — it can never disagree with `audit_errors + error_exceptions`.
-7. `audit_logs` and `*_events` / history tables are append-only.
-8. Live activation/reset tokens: at most one per employee per type.
+7. `total_errors` is a generated column — it can never disagree with `audit_errors + error_exceptions`.
+8. `audit_logs` and `*_events` / history tables are append-only.
+9. Live activation/reset tokens: at most one per employee per type.
 
 ## 6. Healthcare data posture (D-05)
 
@@ -227,15 +227,15 @@ API tasks use one Prisma client per process with a bounded pool (`connection_lim
 
 ## 8. Database automation (no manual SQL)
 
-| Command (Phase 1–2) | What it does |
-|---|---|
-| `pnpm db:migrate` | `prisma migrate deploy` against the configured `DATABASE_URL` |
-| `pnpm db:migrate:dev` | create/apply migrations locally |
-| `pnpm db:seed` | idempotent system seed (organization, settings, CPH formula) |
-| `pnpm db:reset` | **local only** — refuses unless `APP_ENV=development` and host is localhost |
-| `pnpm db:health` | connection, latency, migrations applied, pending migrations |
-| `pnpm db:verify` | required tables/enums/indexes/partial uniques/triggers exist; seed present; orphan & duplicate checks; in fresh deployments reports `Business data: CLEAN` |
-| `pnpm bootstrap:manager` | creates the first Manager (pending activation) and emails the activation link |
+| Command (Phase 1–2)      | What it does                                                                                                                                               |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm db:migrate`        | `prisma migrate deploy` against the configured `DATABASE_URL`                                                                                              |
+| `pnpm db:migrate:dev`    | create/apply migrations locally                                                                                                                            |
+| `pnpm db:seed`           | idempotent system seed (organization, settings, CPH formula)                                                                                               |
+| `pnpm db:reset`          | **local only** — refuses unless `APP_ENV=development` and host is localhost                                                                                |
+| `pnpm db:health`         | connection, latency, migrations applied, pending migrations                                                                                                |
+| `pnpm db:verify`         | required tables/enums/indexes/partial uniques/triggers exist; seed present; orphan & duplicate checks; in fresh deployments reports `Business data: CLEAN` |
+| `pnpm bootstrap:manager` | creates the first Manager (pending activation) and emails the activation link                                                                              |
 
 Example `db:verify` output:
 

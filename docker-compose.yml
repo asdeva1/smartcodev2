@@ -1,0 +1,52 @@
+# Local development services only (never used for staging/production).
+#   cp .env.example .env   # set POSTGRES_PASSWORD (local only, git-ignored)
+#   pnpm dev:services       # docker compose up -d
+# PostgreSQL is pinned to the major version used on RDS. No credentials are stored in this file.
+name: smartcode-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: smartcode
+      POSTGRES_DB: smartcode_dev
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (local development only)}
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U smartcode -d smartcode_dev']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Captures every outgoing email locally (activation / reset links) — UI at http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - '127.0.0.1:1025:1025'
+      - '127.0.0.1:8025:8025'
+
+  # S3-compatible object storage for local CSV uploads and reports (used from Phase 6).
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: smartcode
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env (local development only)}
+    ports:
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
+    volumes:
+      - minio-data:/data
+
+  # Queues, rate limiting and realtime fan-out (used from Phase 3).
+  redis:
+    image: valkey/valkey:8-alpine
+    ports:
+      - '127.0.0.1:6379:6379'
+
+volumes:
+  postgres-data:
+  minio-data:

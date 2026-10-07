@@ -4,13 +4,13 @@ The logo supplied by SmartClues is the **branding source of truth**. It is store
 
 ## Assets (`packages/brand/assets`)
 
-| File | What it is | Use |
-|---|---|---|
-| `source/smartcode-horizontal-light.original.png` | Original upload, 1536 × 410, untouched | Archive / source of truth |
-| `web/smartcode-logo-horizontal.png` | Original cropped to the artwork with even margin (1192 × 350) | Login, activation, reset, landing page, header, reports, PDF, emails |
-| `web/smartcode-logo-horizontal@1x.png` | Same, half size (596 × 175) | Sidebar (expanded), emails |
-| `web/smartcode-mark.png` | The "S" mark cropped from the original (262 × 262) | Collapsed sidebar, mobile header, app icon |
-| `favicon/favicon.ico`, `icon-16/32/48/180/192.png`, `apple-touch-icon.png` | Downscaled from the mark | Browser tab, bookmarks, PWA manifest |
+| File                                                                       | What it is                                                    | Use                                                                  |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `source/smartcode-horizontal-light.original.png`                           | Original upload, 1536 × 410, untouched                        | Archive / source of truth                                            |
+| `web/smartcode-logo-horizontal.png`                                        | Original cropped to the artwork with even margin (1192 × 350) | Login, activation, reset, landing page, header, reports, PDF, emails |
+| `web/smartcode-logo-horizontal@1x.png`                                     | Same, half size (596 × 175)                                   | Sidebar (expanded), emails                                           |
+| `web/smartcode-mark.png`                                                   | The "S" mark cropped from the original (262 × 262)            | Collapsed sidebar, mobile header, app icon                           |
+| `favicon/favicon.ico`, `icon-16/32/48/180/192.png`, `apple-touch-icon.png` | Downscaled from the mark                                      | Browser tab, bookmarks, PWA manifest                                 |
 
 Proportions are always preserved (`object-fit: contain`, width or height set, never both).
 
@@ -22,14 +22,14 @@ Proportions are always preserved (`object-fit: contain`, width or height set, ne
 
 ## Colour tokens (sampled from the logo — confirm against official brand guide)
 
-| Token | Hex | Sampled from |
-|---|---|---|
-| `brand.navy` | `#011030` | "SMART" wordmark |
-| `brand.blue` | `#0C70F9` | "SmartClues" in tagline |
-| `brand.royal` | `#0241B2` | S mark (deep blue) |
-| `brand.azure` | `#0272DB` | "CODE" wordmark (blue) |
-| `brand.cyan` | `#00AAE6` | S mark / "CODE" (cyan) |
-| `brand.green` | `#1FDB92` | S mark (green) |
+| Token         | Hex       | Sampled from                                            |
+| ------------- | --------- | ------------------------------------------------------- |
+| `brand.navy`  | `#011030` | "SMART" wordmark                                        |
+| `brand.blue`  | `#0C70F9` | "SmartClues" in tagline                                 |
+| `brand.royal` | `#0241B2` | S mark (deep blue)                                      |
+| `brand.azure` | `#0272DB` | "CODE" wordmark (blue)                                  |
+| `brand.cyan`  | `#00AAE6` | S mark / "CODE" (cyan)                                  |
+| `brand.green` | `#1FDB92` | S mark (green)                                          |
 | `brand.slate` | `#6B87A7` | tagline (anti-aliased sample; true value likely darker) |
 
 These become the MUI theme (`primary` = blue, `secondary` = green, text = navy) in Phase 1, with contrast checked for WCAG AA.

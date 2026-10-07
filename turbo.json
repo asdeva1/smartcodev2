@@ -1,0 +1,38 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "stream",
+  "globalDependencies": [".env.example", "packages/config/tsconfig/*.json"],
+  "globalEnv": ["APP_ENV", "NODE_ENV"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**", "cdk.out/**"],
+      "env": ["NEXT_PUBLIC_*"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "env": ["NEXT_PUBLIC_*"]
+    },
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"],
+      "env": ["DATABASE_URL"]
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    }
+  },
+  "globalPassThroughEnv": [
+    "DATABASE_MIGRATION_URL",
+    "PRISMA_SCHEMA_ENGINE_BINARY",
+    "PLAYWRIGHT_CHROMIUM_EXECUTABLE",
+    "CDK_DEFAULT_ACCOUNT",
+    "CDK_DEFAULT_REGION",
+    "CI"
+  ]
+}

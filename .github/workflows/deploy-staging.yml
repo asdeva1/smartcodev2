@@ -1,0 +1,57 @@
+name: Deploy staging (foundation)
+
+# Deployment foundation (docs/11-deployment-architecture.md §4). Inert until the staging AWS account exists:
+# it runs only when the repository variable STAGING_DEPLOY_ENABLED is 'true' and uses GitHub OIDC
+# (no stored AWS keys). Order: image → migrate task → db:verify → ECS service → smoke tests.
+# Production deployment (manual approval, same image digest) is added in Phase 13.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.STAGING_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_STAGING }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+      - name: Build and push API images (runtime + migrator)
+        env:
+          REPO: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY_STAGING }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -f apps/api/Dockerfile --target runtime -t "$REPO:$TAG" .
+          docker build -f apps/api/Dockerfile --target migrator -t "$REPO:$TAG-migrator" .
+          docker push "$REPO:$TAG" && docker push "$REPO:$TAG-migrator"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Deploy infrastructure with the new image tag (migrate task definition + API service)
+        working-directory: infra/cdk
+        run: >-
+          pnpm exec cdk deploy --all --require-approval never
+          -c env=staging -c imageTag=${{ github.sha }}
+          -c certificateArn=${{ vars.STAGING_CERTIFICATE_ARN }}
+          -c webUrl=${{ vars.STAGING_WEB_URL }} -c apiUrl=${{ vars.STAGING_API_URL }}
+      # Phase 13: run the migrate task (aws ecs run-task) and db:verify before the service update,
+      # then `pnpm smoke` against STAGING_API_URL / STAGING_WEB_URL. Kept out until the account exists.

@@ -1,0 +1,30 @@
+// SmartCode V2 — Prisma schema (docs/02-database-architecture.md).
+//
+// Phase 1 (foundation): generator, datasource and the Organization root entity only.
+// Phase 2 adds the full schema (employees, vendors, projects, charts, audits, …) with partial unique
+// indexes and triggers written as raw SQL inside migration files.
+//
+// Conventions: snake_case tables via @@map, UUID primary keys, timestamptz, no cascading deletes.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// The tenant root. V1 runs a single organization (SmartClues); every business table references it.
+model Organization {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String
+  slug      String   @unique
+  timeZone  String   @default("Asia/Kolkata") @map("time_zone")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("organizations")
+}

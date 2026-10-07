@@ -4,20 +4,20 @@ Status: **Approved (Phase 0)** — final decisions applied
 
 ## 1. Layers
 
-| Layer | Tool | Runs against | What it covers |
-|---|---|---|---|
-| Static | TypeScript strict, ESLint, Prettier, gitleaks | source | Types, lint, formatting, secrets |
-| Shared logic unit | Vitest | `packages/shared` | State machines (every allowed/denied transition), permission matrix, zod schemas, CPH formula |
-| Backend unit | Jest (NestJS testing module) | services with mocked repositories | Business rules per module |
-| Backend integration / database | Jest + **real PostgreSQL** (Docker service in CI) | API + Prisma + migrations | Repositories, transactions, partial unique indexes, triggers, migrations apply cleanly from zero |
-| RBAC | Jest, generated from `packages/shared/rbac` | HTTP layer (Supertest) | **Every route × every role** → allowed / 403 / 404; deny-by-default check |
-| Vendor isolation | Jest integration | HTTP layer | Two vendors seeded; zero cross-visibility on every list/detail/report/export |
-| Frontend component | Vitest + React Testing Library | components | Forms, validation messages, tables, wizard steps, empty/loading/error states |
-| Frontend page | Vitest + RTL + **MSW** | pages with mocked API | Role-based navigation, page behaviour |
-| API contract | OpenAPI diff in CI | generated spec | Breaking-change detection between web client and API |
-| E2E | **Playwright** | full stack (docker compose in CI; staging after deploy) | The business workflow below |
-| Smoke | Node script | staging / production URLs | Health, login page, auth & RBAC negative checks |
-| Accessibility | axe (Playwright) | key pages | WCAG 2.1 AA basics |
+| Layer                          | Tool                                              | Runs against                                            | What it covers                                                                                   |
+| ------------------------------ | ------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Static                         | TypeScript strict, ESLint, Prettier, gitleaks     | source                                                  | Types, lint, formatting, secrets                                                                 |
+| Shared logic unit              | Vitest                                            | `packages/shared`                                       | State machines (every allowed/denied transition), permission matrix, zod schemas, CPH formula    |
+| Backend unit                   | Jest (NestJS testing module)                      | services with mocked repositories                       | Business rules per module                                                                        |
+| Backend integration / database | Jest + **real PostgreSQL** (Docker service in CI) | API + Prisma + migrations                               | Repositories, transactions, partial unique indexes, triggers, migrations apply cleanly from zero |
+| RBAC                           | Jest, generated from `packages/shared/rbac`       | HTTP layer (Supertest)                                  | **Every route × every role** → allowed / 403 / 404; deny-by-default check                        |
+| Vendor isolation               | Jest integration                                  | HTTP layer                                              | Two vendors seeded; zero cross-visibility on every list/detail/report/export                     |
+| Frontend component             | Vitest + React Testing Library                    | components                                              | Forms, validation messages, tables, wizard steps, empty/loading/error states                     |
+| Frontend page                  | Vitest + RTL + **MSW**                            | pages with mocked API                                   | Role-based navigation, page behaviour                                                            |
+| API contract                   | OpenAPI diff in CI                                | generated spec                                          | Breaking-change detection between web client and API                                             |
+| E2E                            | **Playwright**                                    | full stack (docker compose in CI; staging after deploy) | The business workflow below                                                                      |
+| Smoke                          | Node script                                       | staging / production URLs                               | Health, login page, auth & RBAC negative checks                                                  |
+| Accessibility                  | axe (Playwright)                                  | key pages                                               | WCAG 2.1 AA basics                                                                               |
 
 ## 2. Mandatory E2E workflow (must pass before production)
 

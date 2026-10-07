@@ -1,0 +1,12 @@
+{
+  "name": "@smartcode/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared TypeScript presets for SmartCode V2 (ESLint and Prettier configs live at the repo root).",
+  "files": [
+    "tsconfig"
+  ],
+  "exports": {
+    "./tsconfig/*": "./tsconfig/*"
+  }
+}

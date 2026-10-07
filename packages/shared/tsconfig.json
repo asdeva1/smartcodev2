@@ -1,0 +1,9 @@
+{
+  "extends": "@smartcode/config/tsconfig/library.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "types": ["node"]
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

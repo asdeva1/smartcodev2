@@ -1,13 +1,53 @@
 {
   "name": "smartcode-v2",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "SmartCode Enterprise V2 — medical coding operations platform (a SmartClues Technology product)",
-  "packageManager": "pnpm@10",
+  "description": "SmartCode Enterprise V2 \u2014 medical coding operations platform (a SmartClues Technology product)",
+  "packageManager": "pnpm@10.28.0",
   "engines": {
     "node": ">=24 <25"
   },
   "scripts": {
-    "phase0:note": "node -e \"console.log('Phase 0: documentation only. Tooling scripts are added in Phase 1 — see docs/14-implementation-roadmap.md')\""
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint && pnpm run lint:root",
+    "lint:root": "prettier --check \"*.{json,md,yaml,yml}\" \"docs/**/*.md\" \".github/**/*.yml\"",
+    "format": "prettier --write .",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:api": "turbo run test --filter=@smartcode/api",
+    "test:web": "turbo run test --filter=@smartcode/web",
+    "test:e2e": "pnpm --filter @smartcode/e2e e2e",
+    "secrets:check": "node scripts/check-secrets.mjs",
+    "env:check": "node scripts/check-env.mjs",
+    "db:generate": "pnpm --filter @smartcode/api db:generate",
+    "db:migrate": "pnpm --filter @smartcode/api db:migrate",
+    "db:migrate:dev": "pnpm --filter @smartcode/api db:migrate:dev",
+    "db:seed": "pnpm --filter @smartcode/api db:seed",
+    "db:reset": "pnpm --filter @smartcode/api db:reset",
+    "db:health": "pnpm --filter @smartcode/api db:health",
+    "db:verify": "pnpm --filter @smartcode/api db:verify",
+    "dev:services": "docker compose up -d",
+    "dev:services:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "eslint": "^10.12.0",
+    "globals": "^17.0.0",
+    "prettier": "^3.6.0",
+    "turbo": "^2.11.7",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "argon2",
+      "esbuild",
+      "prisma",
+      "sharp",
+      "unrs-resolver",
+      "@swc/core"
+    ]
   }
 }

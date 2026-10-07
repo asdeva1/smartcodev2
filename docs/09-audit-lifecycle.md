@@ -6,13 +6,13 @@ Status: **Approved (Phase 0)** — decision D-01 is final.
 
 **Only a MANAGER resolves `REVIEW_REQUIRED`.**
 
-| Role | Allowed |
-|---|---|
-| Auditor | Performs the audit (PASS or REVIEW_REQUIRED). **Cannot resolve their own REVIEW_REQUIRED decision.** |
-| Manager | Approves (→ COMPLETED) or rejects (→ REWORK) |
-| Team Lead | Cannot resolve, approve, reject, or send an audit directly to rework → **HTTP 403** |
-| Group Coach / SME | Cannot resolve audits → 403 |
-| Coder, Vendor Admin, HR | Cannot resolve → 403 |
+| Role                    | Allowed                                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------- |
+| Auditor                 | Performs the audit (PASS or REVIEW_REQUIRED). **Cannot resolve their own REVIEW_REQUIRED decision.** |
+| Manager                 | Approves (→ COMPLETED) or rejects (→ REWORK)                                                         |
+| Team Lead               | Cannot resolve, approve, reject, or send an audit directly to rework → **HTTP 403**                  |
+| Group Coach / SME       | Cannot resolve audits → 403                                                                          |
+| Coder, Vendor Admin, HR | Cannot resolve → 403                                                                                 |
 
 Enforced in three layers: permission guard (`audit.resolveReview` → MANAGER only) → service (audit state, resolver role, resolver ≠ auditor of that entry) → database trigger on `audit_resolutions` (resolver must be an ACTIVE MANAGER).
 

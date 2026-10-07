@@ -1,0 +1,20 @@
+{
+  "name": "@smartcode/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "End-to-end tests (Playwright) for SmartCode V2 \u2014 web + API together.",
+  "type": "module",
+  "scripts": {
+    "e2e": "playwright test",
+    "e2e:list": "playwright test --list",
+    "install:browsers": "playwright install --with-deps chromium",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@smartcode/config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "typescript": "~6.0.3"
+  }
+}

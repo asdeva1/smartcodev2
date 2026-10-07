@@ -1,0 +1,186 @@
+import { type Permission, type Role, scopeFor } from '@smartcode/shared';
+
+/**
+ * Workspace navigation, derived from the shared permission matrix so the menu can never offer something the
+ * API would refuse. `available` flips to true as each module ships (docs/14-implementation-roadmap.md).
+ */
+export interface NavItem {
+  key: string;
+  label: string;
+  href: string;
+  permission: Permission;
+  group: 'Overview' | 'Operations' | 'Quality' | 'People' | 'Administration';
+  available: boolean;
+  /** Hide when the role only holds the permission for its own records (e.g. a coder's own profile). */
+  requiresBroaderThanSelf?: boolean;
+}
+
+export const NAV_ITEMS: readonly NavItem[] = [
+  {
+    key: 'manager-dashboard',
+    label: 'Manager dashboard',
+    href: '/manager',
+    permission: 'dashboard.manager',
+    group: 'Overview',
+    available: true,
+  },
+  {
+    key: 'vendor-dashboard',
+    label: 'Vendor dashboard',
+    href: '/vendor',
+    permission: 'dashboard.vendor',
+    group: 'Overview',
+    available: false,
+  },
+  {
+    key: 'team-dashboard',
+    label: 'My team',
+    href: '/team-lead',
+    permission: 'dashboard.teamLead',
+    group: 'Overview',
+    available: false,
+  },
+  {
+    key: 'coach-dashboard',
+    label: 'Quality coaching',
+    href: '/sme',
+    permission: 'dashboard.groupCoach',
+    group: 'Overview',
+    available: false,
+  },
+  {
+    key: 'coder-home',
+    label: 'My charts',
+    href: '/coder',
+    permission: 'dashboard.coder',
+    group: 'Overview',
+    available: false,
+  },
+  {
+    key: 'auditor-home',
+    label: 'Audit queue',
+    href: '/auditor',
+    permission: 'dashboard.auditor',
+    group: 'Overview',
+    available: false,
+  },
+  {
+    key: 'clients',
+    label: 'Clients & projects',
+    href: '/projects',
+    permission: 'project.read',
+    group: 'Operations',
+    available: false,
+  },
+  {
+    key: 'charts',
+    label: 'Chart repository',
+    href: '/charts',
+    permission: 'chart.read',
+    group: 'Operations',
+    available: false,
+  },
+  {
+    key: 'allocation',
+    label: 'Chart allocation',
+    href: '/allocation',
+    permission: 'chart.allocate',
+    group: 'Operations',
+    available: false,
+  },
+  {
+    key: 'login-names',
+    label: 'Login names',
+    href: '/login-names',
+    permission: 'loginName.assign',
+    group: 'Operations',
+    available: false,
+  },
+  {
+    key: 'reviews',
+    label: 'Audit reviews',
+    href: '/audit-reviews',
+    permission: 'audit.resolveReview',
+    group: 'Quality',
+    available: false,
+  },
+  {
+    key: 'rework',
+    label: 'Rework',
+    href: '/rework',
+    permission: 'rework.read',
+    group: 'Quality',
+    available: false,
+  },
+  {
+    key: 'employees',
+    label: 'Employee directory',
+    href: '/employees',
+    permission: 'employee.read',
+    group: 'People',
+    available: false,
+    requiresBroaderThanSelf: true,
+  },
+  {
+    key: 'vendors',
+    label: 'Vendors',
+    href: '/vendors',
+    permission: 'vendor.manage',
+    group: 'People',
+    available: false,
+  },
+  {
+    key: 'teams',
+    label: 'Teams',
+    href: '/teams',
+    permission: 'team.manage',
+    group: 'People',
+    available: false,
+  },
+  {
+    key: 'reports',
+    label: 'Reports',
+    href: '/reports',
+    permission: 'report.read',
+    group: 'Administration',
+    available: false,
+  },
+  {
+    key: 'audit-log',
+    label: 'Audit log',
+    href: '/audit-log',
+    permission: 'auditLog.read',
+    group: 'Administration',
+    available: false,
+  },
+  {
+    key: 'settings',
+    label: 'Settings',
+    href: '/settings',
+    permission: 'settings.manage',
+    group: 'Administration',
+    available: false,
+  },
+];
+
+export const NAV_GROUP_ORDER: readonly NavItem['group'][] = [
+  'Overview',
+  'Operations',
+  'Quality',
+  'People',
+  'Administration',
+];
+
+export function navigationFor(role: Role): NavItem[] {
+  return NAV_ITEMS.filter((item) => {
+    const scope = scopeFor(role, item.permission);
+    return scope !== null && !(item.requiresBroaderThanSelf && scope === 'SELF');
+  });
+}
+
+export function groupedNavigation(role: Role): { group: NavItem['group']; items: NavItem[] }[] {
+  const items = navigationFor(role);
+  return NAV_GROUP_ORDER.map((group) => ({ group, items: items.filter((i) => i.group === group) })).filter(
+    (g) => g.items.length > 0,
+  );
+}

@@ -6,17 +6,17 @@ Status: **Approved (Phase 0)** — final decisions applied
 
 ## 1. Components
 
-| Piece | Design |
-|---|---|
-| Password hashing | **Argon2id** (memory-hard; parameters tuned to ~250 ms on the API task size). Stored in `credentials`, never in `employees`. |
-| Password policy | Min 12 characters; rejects passwords containing the email/name; strength check (zxcvbn score ≥ 3); optional breached-password check (k-anonymity) — D-17. |
-| Access token | JWT, **15 min**, signed **ES256** with key ID (`kid`) for rotation. Claims: `sub`, `role`, `vid` (vendor), `sid` (session), `pv` (permissions version). |
-| Refresh token | Opaque 256-bit random, **SHA-256 hashed** in `sessions`; rotated on every refresh; **reuse detection** revokes the whole token family. Idle timeout 12 h, absolute 7 days (configurable). |
-| Browser storage | `httpOnly; Secure; SameSite=Lax` cookies on the shared parent domain: `sc_at` (access), `sc_rt` (refresh, `Path=/api/v1/auth`). No tokens in `localStorage`. |
-| CSRF | SameSite=Lax + double-submit token (`sc_csrf` readable cookie echoed in `X-CSRF-Token`) + `Origin` allow-list check. |
-| Immediate revocation | Each request checks the session's `revoked_at` and the employee's status via a Redis cache (≤ 30 s TTL), so deactivation/reset takes effect within seconds, not at token expiry. |
-| Brute force | Rate limits per IP and per email; 5 failed attempts → 15 min lock (`LOCKED` + `locked_until`); generic error messages. |
-| Mobile (V2) | Same endpoints in bearer mode; refresh token kept in secure device storage. |
+| Piece                | Design                                                                                                                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Password hashing     | **Argon2id** (memory-hard; parameters tuned to ~250 ms on the API task size). Stored in `credentials`, never in `employees`.                                                              |
+| Password policy      | Min 12 characters; rejects passwords containing the email/name; strength check (zxcvbn score ≥ 3); optional breached-password check (k-anonymity) — D-17.                                 |
+| Access token         | JWT, **15 min**, signed **ES256** with key ID (`kid`) for rotation. Claims: `sub`, `role`, `vid` (vendor), `sid` (session), `pv` (permissions version).                                   |
+| Refresh token        | Opaque 256-bit random, **SHA-256 hashed** in `sessions`; rotated on every refresh; **reuse detection** revokes the whole token family. Idle timeout 12 h, absolute 7 days (configurable). |
+| Browser storage      | `httpOnly; Secure; SameSite=Lax` cookies on the shared parent domain: `sc_at` (access), `sc_rt` (refresh, `Path=/api/v1/auth`). No tokens in `localStorage`.                              |
+| CSRF                 | SameSite=Lax + double-submit token (`sc_csrf` readable cookie echoed in `X-CSRF-Token`) + `Origin` allow-list check.                                                                      |
+| Immediate revocation | Each request checks the session's `revoked_at` and the employee's status via a Redis cache (≤ 30 s TTL), so deactivation/reset takes effect within seconds, not at token expiry.          |
+| Brute force          | Rate limits per IP and per email; 5 failed attempts → 15 min lock (`LOCKED` + `locked_until`); generic error messages.                                                                    |
+| Mobile (V2)          | Same endpoints in bearer mode; refresh token kept in secure device storage.                                                                                                               |
 
 This requires the web app and API to share a registrable domain (e.g. `app.example.com` + `api.example.com`) — see D-06.
 
@@ -34,6 +34,7 @@ This requires the web app and API to share a registrable domain (e.g. `app.examp
 ## 3. Flows
 
 ### Login
+
 ```mermaid
 sequenceDiagram
   participant U as Browser
@@ -57,6 +58,7 @@ sequenceDiagram
 ```
 
 ### Employee creation → activation
+
 ```mermaid
 sequenceDiagram
   participant M as Manager / Vendor Admin
@@ -74,6 +76,7 @@ sequenceDiagram
 ```
 
 ### Forgot password / Manager-triggered reset
+
 Either the employee (`/password/forgot`) or a Manager/Vendor Admin (`POST /employees/:id/password-reset`) creates a reset token. The link is emailed **to the employee only**. On reset, all sessions are revoked and the event is audit-logged (who triggered it, never the password).
 
 ## 4. Bootstrap of the first Manager (no hard-coded passwords)

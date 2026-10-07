@@ -4,11 +4,11 @@ Status: **Approved (Phase 0)** — final decisions applied. Nothing is provision
 
 ## 1. Environments
 
-| Environment | Web | API / DB | Branch | Data |
-|---|---|---|---|---|
+| Environment | Web                                                                                  | API / DB                                                     | Branch           | Data                                        |
+| ----------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------ | ---------------- | ------------------------------------------- |
 | Development | `localhost:3000` (domains are configuration — `WEB_URL`, `API_URL`, `APP_URL`; D-06) | Local Docker: PostgreSQL, Redis, MinIO (S3), Mailpit (email) | feature branches | Throw-away local data; **never** a cloud DB |
-| Staging | Vercel (Preview / `staging` alias) — `app.staging.<domain>` | AWS **staging account** — `api.staging.<domain>` | `develop` | Synthetic test data only |
-| Production | Vercel Production — `app.<domain>` | AWS **production account** — `api.<domain>` | `main` | Real data; starts empty + bootstrap Manager |
+| Staging     | Vercel (Preview / `staging` alias) — `app.staging.<domain>`                          | AWS **staging account** — `api.staging.<domain>`             | `develop`        | Synthetic test data only                    |
+| Production  | Vercel Production — `app.<domain>`                                                   | AWS **production account** — `api.<domain>`                  | `main`           | Real data; starts empty + bootstrap Manager |
 
 Separate AWS accounts (via AWS Organizations) for staging and production: a staging credential physically cannot touch production. Each environment has its own database, buckets, secrets, SES config and keys. The API refuses to start if `APP_ENV` and the database host don't match the expected environment pattern.
 
@@ -44,18 +44,18 @@ flowchart TB
   API & WRK -.-> CW[CloudWatch logs · metrics · alarms]
 ```
 
-| Service | Configuration |
-|---|---|
-| ECS Fargate | One Docker image, three modes: `api`, `worker`, `task` (migrate / bootstrap / verify). Rolling deploys with circuit-breaker auto-rollback. |
-| RDS PostgreSQL | Encrypted (KMS), automated backups + PITR (7 d staging, 35 d prod), deletion protection, Multi-AZ in prod, Performance Insights, no public access. |
-| ElastiCache | Valkey/Redis, TLS + auth, used for queues, rate limiting, SSE fan-out, cache. |
-| S3 | `smartcode-<env>-uploads`, `smartcode-<env>-reports`; block public access; presigned URLs (5–15 min); lifecycle rules; versioning on reports. |
-| SES | Domain identity with DKIM/SPF/DMARC; configuration set → SNS for bounces/complaints; **production access request** needed to leave the SES sandbox. |
-| Secrets Manager | DB credentials (auto-rotation), JWT signing keys, other secrets; injected as ECS task secrets. |
-| CloudWatch | Log groups (30 d staging / 1 y prod), alarms: 5xx rate, p95 latency, task health, RDS CPU/connections/storage, queue depth, SES bounce rate → SNS email. |
-| WAF | AWS managed common + known-bad-inputs rules, IP rate limits on `/api/v1/auth/*`. |
-| IaC | AWS CDK (TypeScript) stacks: `Network`, `Data`, `Storage`, `Email`, `Api`, `Monitoring`; `cdk diff` reviewed in PRs. |
-| Region | Configurable per environment. Because SmartCode may handle US healthcare data (D-05), the production region and account setup (AWS BAA, HIPAA-eligible services only) must be reviewed **before real PHI is introduced**. Staging/dev hold synthetic data only. |
+| Service         | Configuration                                                                                                                                                                                                                                                   |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ECS Fargate     | One Docker image, three modes: `api`, `worker`, `task` (migrate / bootstrap / verify). Rolling deploys with circuit-breaker auto-rollback.                                                                                                                      |
+| RDS PostgreSQL  | Encrypted (KMS), automated backups + PITR (7 d staging, 35 d prod), deletion protection, Multi-AZ in prod, Performance Insights, no public access.                                                                                                              |
+| ElastiCache     | Valkey/Redis, TLS + auth, used for queues, rate limiting, SSE fan-out, cache.                                                                                                                                                                                   |
+| S3              | `smartcode-<env>-uploads`, `smartcode-<env>-reports`; block public access; presigned URLs (5–15 min); lifecycle rules; versioning on reports.                                                                                                                   |
+| SES             | Domain identity with DKIM/SPF/DMARC; configuration set → SNS for bounces/complaints; **production access request** needed to leave the SES sandbox.                                                                                                             |
+| Secrets Manager | DB credentials (auto-rotation), JWT signing keys, other secrets; injected as ECS task secrets.                                                                                                                                                                  |
+| CloudWatch      | Log groups (30 d staging / 1 y prod), alarms: 5xx rate, p95 latency, task health, RDS CPU/connections/storage, queue depth, SES bounce rate → SNS email.                                                                                                        |
+| WAF             | AWS managed common + known-bad-inputs rules, IP rate limits on `/api/v1/auth/*`.                                                                                                                                                                                |
+| IaC             | AWS CDK (TypeScript) stacks: `Network`, `Data`, `Storage`, `Email`, `Api`, `Monitoring`; `cdk diff` reviewed in PRs.                                                                                                                                            |
+| Region          | Configurable per environment. Because SmartCode may handle US healthcare data (D-05), the production region and account setup (AWS BAA, HIPAA-eligible services only) must be reviewed **before real PHI is introduced**. Staging/dev hold synthetic data only. |
 
 ## 3. Vercel architecture
 

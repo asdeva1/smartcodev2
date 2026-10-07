@@ -1,0 +1,12 @@
+node_modules
+dist
+.next
+coverage
+cdk.out
+pnpm-lock.yaml
+**/generated/**
+**/public/brand/**
+playwright-report
+test-results
+packages/brand/assets
+**/next-env.d.ts

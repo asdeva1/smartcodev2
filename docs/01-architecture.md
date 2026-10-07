@@ -39,19 +39,19 @@ flowchart LR
   M -.->|Bearer tokens| WAF
 ```
 
-| Layer | Choice | Why |
-|---|---|---|
-| Frontend | **Next.js (App Router) + TypeScript + Material UI** on **Vercel** | Requested stack; Vercel gives preview deployments per PR. |
-| Backend | **NestJS + TypeScript** on **AWS ECS Fargate** | Long-running process: stable DB connection pool, SSE streams, background workers, no cold starts or function time limits. |
-| Database | **PostgreSQL on AWS RDS** (Multi-AZ in production) | Highly relational domain; partial unique indexes and transactions enforce business invariants. |
-| ORM | **Prisma** (migrations via `prisma migrate`) | Requested; typed queries; versioned migrations. Raw SQL only inside migrations for constraints Prisma can't express (partial indexes, triggers). |
-| Jobs / cache | **Redis (ElastiCache Valkey)** + **BullMQ** | Email outbox, CSV processing, report generation, rate limiting store, SSE fan-out across API tasks. |
-| Files | **S3** (private, KMS-encrypted, presigned URLs) | CSV uploads, generated reports, documents. Nothing large in PostgreSQL. |
-| Email | **SES** + React Email templates | Activation, reset, notifications. |
-| Secrets | **Secrets Manager** → ECS task secrets | No secrets in code, images or Git. |
-| Monitoring | **CloudWatch** logs, metrics, alarms | Requested; structured JSON logs with request IDs. |
-| IaC | **AWS CDK (TypeScript)** in `infra/cdk` | Same language as the app; reviewable, repeatable environments. |
-| CI/CD | **GitHub Actions** (OIDC to AWS — no long-lived keys) + Vercel Git integration | Requested. |
+| Layer        | Choice                                                                         | Why                                                                                                                                              |
+| ------------ | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Frontend     | **Next.js (App Router) + TypeScript + Material UI** on **Vercel**              | Requested stack; Vercel gives preview deployments per PR.                                                                                        |
+| Backend      | **NestJS + TypeScript** on **AWS ECS Fargate**                                 | Long-running process: stable DB connection pool, SSE streams, background workers, no cold starts or function time limits.                        |
+| Database     | **PostgreSQL on AWS RDS** (Multi-AZ in production)                             | Highly relational domain; partial unique indexes and transactions enforce business invariants.                                                   |
+| ORM          | **Prisma** (migrations via `prisma migrate`)                                   | Requested; typed queries; versioned migrations. Raw SQL only inside migrations for constraints Prisma can't express (partial indexes, triggers). |
+| Jobs / cache | **Redis (ElastiCache Valkey)** + **BullMQ**                                    | Email outbox, CSV processing, report generation, rate limiting store, SSE fan-out across API tasks.                                              |
+| Files        | **S3** (private, KMS-encrypted, presigned URLs)                                | CSV uploads, generated reports, documents. Nothing large in PostgreSQL.                                                                          |
+| Email        | **SES** + React Email templates                                                | Activation, reset, notifications.                                                                                                                |
+| Secrets      | **Secrets Manager** → ECS task secrets                                         | No secrets in code, images or Git.                                                                                                               |
+| Monitoring   | **CloudWatch** logs, metrics, alarms                                           | Requested; structured JSON logs with request IDs.                                                                                                |
+| IaC          | **AWS CDK (TypeScript)** in `infra/cdk`                                        | Same language as the app; reviewable, repeatable environments.                                                                                   |
+| CI/CD        | **GitHub Actions** (OIDC to AWS — no long-lived keys) + Vercel Git integration | Requested.                                                                                                                                       |
 
 ### Why the API is not on Vercel
 
@@ -137,14 +137,14 @@ Controller ──► Guards (Auth → Permission) ──► Service ──► Re
 
 Not everything needs push updates. Classification:
 
-| Screen | Mechanism |
-|---|---|
-| Manager Dashboard counters, Vendor Dashboard | SSE event → re-fetch; 30 s polling fallback |
-| Chart Repository / allocation tracking | SSE `chart.*` events invalidate affected queries |
-| Coder workspace (new assignment, rework) | SSE + notification |
-| Auditor queue, Manager review queue | SSE `audit.*` events |
-| Notifications bell | SSE |
-| Reports, directory, settings | Normal fetch on navigation — no realtime |
+| Screen                                       | Mechanism                                        |
+| -------------------------------------------- | ------------------------------------------------ |
+| Manager Dashboard counters, Vendor Dashboard | SSE event → re-fetch; 30 s polling fallback      |
+| Chart Repository / allocation tracking       | SSE `chart.*` events invalidate affected queries |
+| Coder workspace (new assignment, rework)     | SSE + notification                               |
+| Auditor queue, Manager review queue          | SSE `audit.*` events                             |
+| Notifications bell                           | SSE                                              |
+| Reports, directory, settings                 | Normal fetch on navigation — no realtime         |
 
 Implementation: `GET /api/v1/events` (SSE) on the API. Business transactions publish small events (`{type, ids, scope}`) to Redis pub/sub **after commit**; each API task forwards only the events the connected user is allowed to see. Events never carry business data — the browser re-reads authoritative data from the API (PostgreSQL is the only source of truth).
 

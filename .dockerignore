@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/.next
+**/coverage
+**/cdk.out
+**/.turbo
+**/playwright-report
+**/test-results
+**/.env
+**/.env.*
+!.env.example
+**/public/brand
+**/src/generated
+.git
+docs
