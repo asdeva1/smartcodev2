@@ -1,0 +1,13 @@
+{
+  "name": "smartcode-v2",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SmartCode Enterprise V2 — medical coding operations platform (a SmartClues Technology product)",
+  "packageManager": "pnpm@10",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "phase0:note": "node -e \"console.log('Phase 0: documentation only. Tooling scripts are added in Phase 1 — see docs/14-implementation-roadmap.md')\""
+  }
+}
