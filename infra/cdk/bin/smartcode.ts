@@ -12,4 +12,7 @@ buildApp(app, {
   webUrl: ctx('webUrl'),
   apiUrl: ctx('apiUrl'),
   appUrl: ctx('appUrl'),
+  mailFrom: ctx('mailFrom'),
+  cookieDomain: ctx('cookieDomain'),
+  desiredCount: ctx('desiredCount') === undefined ? undefined : Number(ctx('desiredCount')),
 });

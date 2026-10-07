@@ -13,6 +13,9 @@ export interface BuildOptions {
   webUrl?: string;
   apiUrl?: string;
   appUrl?: string;
+  mailFrom?: string;
+  cookieDomain?: string;
+  desiredCount?: number;
 }
 
 /** Builds every stack for one environment. Used by bin/smartcode.ts and the assertion tests. */
@@ -36,6 +39,9 @@ export function buildApp(app: App, options: BuildOptions) {
     storageKey: storage.key,
     certificateArn: options.certificateArn,
     imageTag: options.imageTag ?? 'unset',
+    mailFrom: options.mailFrom,
+    cookieDomain: options.cookieDomain,
+    desiredCountOverride: options.desiredCount,
     // D-06: domains are configuration. Placeholders until the real domains are decided.
     urls: {
       web: webUrl,

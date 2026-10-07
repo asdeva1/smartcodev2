@@ -5,6 +5,7 @@ import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as ecsPatterns from 'aws-cdk-lib/aws-ecs-patterns';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import type * as kms from 'aws-cdk-lib/aws-kms';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import type * as rds from 'aws-cdk-lib/aws-rds';
@@ -28,6 +29,12 @@ export interface ApiStackProps extends StackProps {
   imageTag: string;
   /** Public URLs (D-06). */
   urls: { web: string; api: string; app: string };
+  /** Verified SES sender (MAIL_FROM). Required when deployed: the API refuses to start without it. */
+  mailFrom?: string;
+  /** Parent domain for the session cookies when web and API are on sibling hosts (optional). */
+  cookieDomain?: string;
+  /** First-deploy escape hatch: 0 creates the service before an image exists in ECR. */
+  desiredCountOverride?: number;
 }
 
 /**
@@ -55,7 +62,12 @@ export class ApiStack extends Stack {
     this.appSecret = new secretsmanager.Secret(this, 'AppSecret', {
       description: `SmartCode ${config.name} API runtime secrets (DATABASE_URL, JWT keys) - populated via runbook`,
       generateSecretString: {
-        secretStringTemplate: JSON.stringify({ DATABASE_URL: '', JWT_PRIVATE_KEY: '', JWT_PUBLIC_KEY: '' }),
+        secretStringTemplate: JSON.stringify({
+          DATABASE_URL: '',
+          DATABASE_MIGRATION_URL: '',
+          JWT_PRIVATE_KEY: '',
+          JWT_PUBLIC_KEY: '',
+        }),
         generateStringKey: 'UNUSED_GENERATED',
       },
     });
@@ -69,7 +81,12 @@ export class ApiStack extends Stack {
       removalPolicy: RemovalPolicy.RETAIN,
     });
 
-    const environment = {
+    if (!props.mailFrom) {
+      Annotations.of(this).addWarning(
+        'No mailFrom supplied: the API will fail config validation when deployed.',
+      );
+    }
+    const environment: Record<string, string> = {
       APP_ENV: config.name,
       NODE_ENV: 'production',
       APP_MODE: 'api',
@@ -81,6 +98,9 @@ export class ApiStack extends Stack {
       AWS_REGION: this.region,
       S3_UPLOADS_BUCKET: props.uploads.bucketName,
       S3_REPORTS_BUCKET: props.reports.bucketName,
+      MAIL_TRANSPORT: 'ses',
+      ...(props.mailFrom ? { MAIL_FROM: props.mailFrom } : {}),
+      ...(props.cookieDomain ? { COOKIE_DOMAIN: props.cookieDomain } : {}),
     };
     const secrets = {
       DATABASE_URL: ecs.Secret.fromSecretsManager(this.appSecret, 'DATABASE_URL'),
@@ -100,7 +120,7 @@ export class ApiStack extends Stack {
 
     this.service = new ecsPatterns.ApplicationLoadBalancedFargateService(this, 'Api', {
       cluster,
-      desiredCount: config.api.desiredCount,
+      desiredCount: Math.max(1, props.desiredCountOverride ?? config.api.desiredCount),
       cpu: config.api.cpu,
       memoryLimitMiB: config.api.memoryMiB,
       publicLoadBalancer: true,
@@ -124,6 +144,10 @@ export class ApiStack extends Stack {
         logDriver: ecs.LogDrivers.awsLogs({ streamPrefix: 'api', logGroup }),
       },
     });
+    if (props.desiredCountOverride === 0) {
+      // The L2 pattern rejects 0; the first deploy happens before any image exists in ECR.
+      (this.service.service.node.defaultChild as ecs.CfnService).desiredCount = 0;
+    }
     this.service.targetGroup.configureHealthCheck({
       path: '/health/live',
       healthyHttpCodes: '200',
@@ -131,7 +155,10 @@ export class ApiStack extends Stack {
     });
     this.service.loadBalancer.setAttribute('routing.http.drop_invalid_header_fields.enabled', 'true');
     this.service.service
-      .autoScaleTaskCount({ minCapacity: config.api.desiredCount, maxCapacity: config.api.maxCount })
+      .autoScaleTaskCount({
+        minCapacity: props.desiredCountOverride ?? config.api.desiredCount,
+        maxCapacity: config.api.maxCount,
+      })
       .scaleOnCpuUtilization('Cpu', { targetUtilizationPercent: 60 });
 
     // Least privilege: database reachable only from the API tasks; buckets read/write only.
@@ -142,15 +169,43 @@ export class ApiStack extends Stack {
     );
     props.uploads.grantReadWrite(this.service.taskDefinition.taskRole);
     props.reports.grantReadWrite(this.service.taskDefinition.taskRole);
+    const sendMail = new iam.PolicyStatement({
+      actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+      resources: [`arn:${this.partition}:ses:${this.region}:${this.account}:identity/*`],
+    });
+    this.service.taskDefinition.taskRole.addToPrincipalPolicy(sendMail);
 
     // One-off migration task (`prisma migrate deploy`), run by CI before each service update.
     const migrate = new ecs.FargateTaskDefinition(this, 'MigrateTask', { cpu: 256, memoryLimitMiB: 512 });
     migrate.addContainer('migrate', {
       image: ecs.ContainerImage.fromEcrRepository(this.repository, `${props.imageTag}-migrator`),
       environment: { APP_ENV: config.name },
-      secrets: { DATABASE_URL: ecs.Secret.fromSecretsManager(this.appSecret, 'DATABASE_URL') },
+      secrets: {
+        DATABASE_URL: ecs.Secret.fromSecretsManager(this.appSecret, 'DATABASE_URL'),
+        DATABASE_MIGRATION_URL: ecs.Secret.fromSecretsManager(this.appSecret, 'DATABASE_MIGRATION_URL'),
+      },
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'migrate', logGroup }),
     });
+
+    // One-off bootstrap task (`pnpm bootstrap:manager` equivalent). Uses the migrator image, which carries the
+    // scripts and tsx. The Manager's details are passed as run-task overrides, never stored here.
+    const bootstrap = new ecs.FargateTaskDefinition(this, 'BootstrapTask', {
+      cpu: 512,
+      memoryLimitMiB: 1024,
+    });
+    bootstrap.addContainer('bootstrap', {
+      image: ecs.ContainerImage.fromEcrRepository(this.repository, `${props.imageTag}-migrator`),
+      command: ['pnpm', 'exec', 'tsx', 'scripts/bootstrap-manager.ts'],
+      environment,
+      secrets,
+      logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'bootstrap', logGroup }),
+    });
+    bootstrap.taskRole.addToPrincipalPolicy(sendMail);
+    props.databaseSecurityGroup.addIngressRule(
+      ec2.Peer.ipv4(props.vpc.vpcCidrBlock),
+      ec2.Port.tcp(5432),
+      'One-off tasks in the VPC to PostgreSQL',
+    );
 
     // WAF: AWS managed protections + rate limit on authentication endpoints.
     const waf = new wafv2.CfnWebACL(this, 'Waf', {
@@ -199,6 +254,8 @@ export class ApiStack extends Stack {
     new CfnOutput(this, 'ApiRepositoryUri', { value: this.repository.repositoryUri });
     new CfnOutput(this, 'LoadBalancerDns', { value: this.service.loadBalancer.loadBalancerDnsName });
     new CfnOutput(this, 'MigrateTaskDefinitionArn', { value: migrate.taskDefinitionArn });
+    new CfnOutput(this, 'BootstrapTaskDefinitionArn', { value: bootstrap.taskDefinitionArn });
+    new CfnOutput(this, 'AppSecretArn', { value: this.appSecret.secretArn });
   }
 }
 

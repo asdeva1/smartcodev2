@@ -121,12 +121,12 @@ describe('production', () => {
     t.api.resourceCountIs('AWS::WAFv2::WebACLAssociation', 1);
   });
 
-  it('ECR images are scanned and immutable; a migration task exists', () => {
+  it('ECR images are scanned and immutable; migration and bootstrap tasks exist', () => {
     t.api.hasResourceProperties('AWS::ECR::Repository', {
       ImageScanningConfiguration: { ScanOnPush: true },
       ImageTagMutability: 'IMMUTABLE',
     });
-    t.api.resourceCountIs('AWS::ECS::TaskDefinition', 2);
+    t.api.resourceCountIs('AWS::ECS::TaskDefinition', 3);
   });
 
   it('VPC flow logs and alarms exist', () => {
