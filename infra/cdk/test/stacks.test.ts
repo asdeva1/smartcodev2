@@ -165,6 +165,13 @@ describe('staging', () => {
     Annotations.fromStack(t.stacks.api).hasWarning('*', Match.stringLikeRegexp('HTTP only'));
   });
 
+  it('allows a shorter backup retention for free-plan accounts, but never in production', () => {
+    const app = new App();
+    const { data } = buildApp(app, { env: 'staging', imageTag: 'test', backupRetentionDays: 1 });
+    Template.fromStack(data).hasResourceProperties('AWS::RDS::DBInstance', { BackupRetentionPeriod: 1 });
+    expect(() => buildApp(new App(), { env: 'production', backupRetentionDays: 1 })).toThrow(/production/);
+  });
+
   it('rejects unknown environments', () => {
     expect(() => buildApp(new App(), { env: 'dev' })).toThrow(/Unknown deployment environment/);
   });

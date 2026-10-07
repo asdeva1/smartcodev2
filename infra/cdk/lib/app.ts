@@ -16,11 +16,20 @@ export interface BuildOptions {
   mailFrom?: string;
   cookieDomain?: string;
   desiredCount?: number;
+  /** Staging only: new AWS accounts on the free plan cap RDS backups at 1 day. Rejected for production. */
+  backupRetentionDays?: number;
 }
 
 /** Builds every stack for one environment. Used by bin/smartcode.ts and the assertion tests. */
 export function buildApp(app: App, options: BuildOptions) {
-  const config = resolveEnvironment(options.env);
+  const resolved = resolveEnvironment(options.env);
+  if (options.backupRetentionDays !== undefined && resolved.name === 'production') {
+    throw new Error('backupRetentionDays cannot be overridden for production.');
+  }
+  const config =
+    options.backupRetentionDays === undefined
+      ? resolved
+      : { ...resolved, database: { ...resolved.database, backupRetentionDays: options.backupRetentionDays } };
   const prefix = `SmartCode-${config.name === 'production' ? 'Prod' : 'Staging'}`;
   const awsEnv = { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION };
 
