@@ -4,7 +4,7 @@ Status: **Approved (Phase 0)** — decisions D-01…D-19 applied
 
 - **Engine**: PostgreSQL (AWS RDS; latest major version supported by RDS at Phase 2, pinned in IaC).
 - **ORM / migrations**: Prisma. Constraints Prisma's schema language can't express (partial unique indexes, append-only triggers, check constraints) are written as raw SQL **inside Prisma migration files**, so `prisma migrate deploy` remains the only way schema changes reach any environment.
-- **No legacy data.** The database is created empty. The only seed is system data: one `Organization`, default `Setting` rows and the default `CphFormula`. The first Manager is created by the bootstrap command (see `06-authentication.md`), not by the seed.
+- **No legacy data.** The database is created empty. The only seed is system data: exactly one `Organization` (settings live in `organizations.settings`; there is no seed for employees, vendors, charts or formulas). The first Manager is created by the bootstrap command (see `06-authentication.md`), not by the seed.
 - **Conventions**: table names `snake_case` plural via `@@map`; PK `id uuid` (UUIDv7); `created_at`/`updated_at` `timestamptz`; every business table carries `organization_id` (single organization in V1, multi-org-ready); foreign keys `ON DELETE RESTRICT` (nothing cascades away history).
 
 ## 1. Entity-relationship diagram (core)
@@ -206,9 +206,29 @@ ApprovalStatus       PENDING | APPROVED | REJECTED | CANCELLED
 4. Chart ID unique within its project.
 5. One current production version per chart; one open audit per production version; one open rework per chart.
 6. Audit resolution only by an active Manager who is not the auditor (trigger) and only once per audit.
-7. `total_errors` is a generated column — it can never disagree with `audit_errors + error_exceptions`.
+7. `total_errors` is set by a `BEFORE INSERT` trigger from `audit_errors + error_exceptions` (any client-supplied value is overwritten) and guarded by a `CHECK`, so it can never disagree. (Implemented as trigger + CHECK rather than a generated column so the sequence/previous-audit logic shares one trigger.)
 8. `audit_logs` and `*_events` / history tables are append-only.
 9. Live activation/reset tokens: at most one per employee per type.
+
+## 5a. Phase 2 as-built notes
+
+The implemented model is authoritative where it differs from the sketches above (see `phases/phase-2.md` for the full table list).
+
+- **Tables (26):** organizations, employees, credentials, auth_tokens, sessions, vendors, teams, team_memberships, login_names, login_name_assignments, clients, projects, project_assignments, charts, chart_status_transitions, chart_status_events, chart_allocations, production_entries, audits, audit_resolutions, reworks, notifications, approval_requests, approval_steps, activity_logs, audit_logs.
+- **Deferred to the phases that use them:** import_batches/import_rows (CSV), file_objects, outbox, cph_formulas, hr_links, visitors.
+- **Soft-delete:** status-based deactivation. `sc_forbid_delete` blocks DELETE on core tables, `sc_append_only` blocks UPDATE/DELETE on logs and history, `sc_forbid_truncate` blocks TRUNCATE. Only DRAFT production entries and credential/token/session/notification rows are purgeable.
+- **Rule errors:** triggers raise custom SQLSTATEs which the API maps to HTTP: `SC403` → 403, `SC409` → 409, `SC422` → 422.
+- **Chart status** may only change along `chart_status_transitions` (mirrored from the shared `CHART_TRANSITIONS`, asserted equal by a test) and only with backing facts (allocation, submitted production version, audit result, open rework). Actor and reason come from transaction-local `app.actor_id` / `app.reason` (`withActor`).
+- **Audit:** one audit per production version (`UNIQUE(production_entry_id)`); `sequence`, `previous_audit_id`, `is_re_audit` computed by trigger; status moves to APPROVED/REJECTED only through an `audit_resolutions` row (Manager-only, not the auditor, once).
+- **Project eligibility:** a vendor employee may be assigned/allocated only on projects with the same `vendor_id`; in-house coders need a direct CODER project assignment.
+- **Log safety:** `sc_json_has_forbidden_key` rejects credential/PHI-like keys in log metadata; the TypeScript redactor mirrors it (a test proves they agree).
+- **Open point for Manager:** which roles may hold a Login Name (currently any active employee eligible for production or audit work).
+
+### Service transaction recipes
+
+1. Reallocate: end old allocation (`ENDED`) → insert new `ACTIVE` allocation → set chart status, all in one `withActor` transaction.
+2. Production submit/correction: mark prior current entry `SUPERSEDED` → insert new version.
+3. Resolution: insert `audit_resolutions` → (trigger updates audit) → create rework if rejected → set chart status.
 
 ## 6. Healthcare data posture (D-05)
 
@@ -231,7 +251,7 @@ API tasks use one Prisma client per process with a bounded pool (`connection_lim
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm db:migrate`        | `prisma migrate deploy` against the configured `DATABASE_URL`                                                                                              |
 | `pnpm db:migrate:dev`    | create/apply migrations locally                                                                                                                            |
-| `pnpm db:seed`           | idempotent system seed (organization, settings, CPH formula)                                                                                               |
+| `pnpm db:seed`           | idempotent system seed (one organization only)                                                                                                             |
 | `pnpm db:reset`          | **local only** — refuses unless `APP_ENV=development` and host is localhost                                                                                |
 | `pnpm db:health`         | connection, latency, migrations applied, pending migrations                                                                                                |
 | `pnpm db:verify`         | required tables/enums/indexes/partial uniques/triggers exist; seed present; orphan & duplicate checks; in fresh deployments reports `Business data: CLEAN` |

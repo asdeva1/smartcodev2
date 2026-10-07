@@ -13,6 +13,8 @@ const shared = {
  * unit         src/**\/*.spec.ts — no external services.
  * integration  test/**\/*.int-spec.ts — real HTTP stack; database checks run when DATABASE_URL is set
  *              (CI provides a PostgreSQL service).
+ * database     test/db/**\/*.db-spec.ts — the real migrations replayed into a throw-away PostgreSQL schema; proves
+ *              every constraint and trigger. Skips (loudly) without DATABASE_URL; CI sets REQUIRE_DATABASE_TESTS=1.
  */
 const config: Config = {
   collectCoverageFrom: [
@@ -26,6 +28,12 @@ const config: Config = {
   projects: [
     { ...shared, displayName: 'unit', testMatch: ['<rootDir>/src/**/*.spec.ts'] },
     { ...shared, displayName: 'integration', testMatch: ['<rootDir>/test/**/*.int-spec.ts'] },
+    {
+      ...shared,
+      displayName: 'database',
+      testMatch: ['<rootDir>/test/db/**/*.db-spec.ts'],
+      testTimeout: 30_000,
+    },
   ],
 };
 

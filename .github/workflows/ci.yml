@@ -20,6 +20,8 @@ env:
   TURBO_TELEMETRY_DISABLED: '1'
   NEXT_TELEMETRY_DISABLED: '1'
   APP_ENV: test
+  # CI must run the PostgreSQL integration tests — a missing database fails the build instead of skipping.
+  REQUIRE_DATABASE_TESTS: '1'
   # Ephemeral CI database: trust auth inside the job's private network, so no password exists anywhere.
   DATABASE_URL: postgresql://postgres@localhost:5432/smartcode_ci
 
@@ -51,6 +53,9 @@ jobs:
 
       - name: Apply migrations to an empty database
         run: pnpm db:migrate
+      - name: Migration status (clean, nothing pending)
+        working-directory: apps/api
+        run: pnpm exec prisma migrate status
       - name: Schema drift check (migrations must match schema.prisma exactly)
         working-directory: apps/api
         run: pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
@@ -58,6 +63,8 @@ jobs:
         run: pnpm db:seed && pnpm db:seed
       - name: Database health and verification
         run: pnpm db:health && pnpm db:verify
+      - name: Reset and recreate from migrations (local-only command, test env)
+        run: pnpm db:reset && pnpm db:verify
 
       - run: pnpm lint
       - run: pnpm typecheck

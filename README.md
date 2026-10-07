@@ -6,7 +6,7 @@
 
 Enterprise medical coding operations platform — Client → Project → Chart Repository → Chart Allocation → Coder Production → Audit → Rework → Re-Audit → Completed.
 
-> **Status: Phase 1 (foundation) complete — awaiting approval for Phase 2.** Start with [`docs/README.md`](docs/README.md).
+> **Status: Phase 2 (database + core data model) complete — awaiting approval for Phase 3.** Start with [`docs/README.md`](docs/README.md).
 
 ## Stack
 

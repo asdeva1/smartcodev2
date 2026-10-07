@@ -1,7 +1,23 @@
 /**
  * Status definitions (docs/02-database-architecture.md §3, decisions D-01..D-04).
- * Mirrors the PostgreSQL enums created in Phase 2.
+ * Mirrors the PostgreSQL enums created in Phase 2 — a database test fails if the two ever differ.
  */
+export const ORGANIZATION_STATUSES = ['ACTIVE', 'SUSPENDED'] as const;
+export type OrganizationStatus = (typeof ORGANIZATION_STATUSES)[number];
+
+/** Vendors, teams, clients and login names. */
+export const ACTIVE_STATUSES = ['ACTIVE', 'INACTIVE'] as const;
+export type ActiveStatus = (typeof ACTIVE_STATUSES)[number];
+
+export const PROJECT_STATUSES = ['ACTIVE', 'ON_HOLD', 'CLOSED'] as const;
+export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+
+export const ALLOCATION_STATUSES = ['ACTIVE', 'ENDED'] as const;
+export type AllocationStatus = (typeof ALLOCATION_STATUSES)[number];
+
+export const LOGIN_NAME_END_REASONS = ['REASSIGNED', 'DEACTIVATED', 'EMPLOYEE_INACTIVE'] as const;
+export type LoginNameEndReason = (typeof LOGIN_NAME_END_REASONS)[number];
+
 export const EMPLOYEE_STATUSES = ['PENDING_ACTIVATION', 'ACTIVE', 'INACTIVE', 'LOCKED'] as const;
 export type EmployeeStatus = (typeof EMPLOYEE_STATUSES)[number];
 

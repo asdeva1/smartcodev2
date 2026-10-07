@@ -31,6 +31,26 @@ describe('ProblemDetailsFilter', () => {
     });
   });
 
+  it('maps database business-rule violations: Manager-only resolution → 403, immutable history → 409', () => {
+    expect(
+      filter.toProblem(
+        new Error(
+          'Database error. Code: `SC403`. Message: `SC403: only an active Manager can resolve a REVIEW_REQUIRED audit`',
+        ),
+      ),
+    ).toMatchObject({
+      status: 403,
+      code: 'FORBIDDEN',
+      detail: 'only an active Manager can resolve a REVIEW_REQUIRED audit',
+    });
+    expect(filter.toProblem(new Error('SC409: allocation history is immutable'))).toMatchObject({
+      status: 409,
+    });
+    expect(filter.toProblem(new Error('SC422: the coder is not assigned to this project'))).toMatchObject({
+      status: 422,
+    });
+  });
+
   it('maps Nest HTTP exceptions', () => {
     expect(filter.toProblem(new NotFoundException())).toMatchObject({ status: 404, code: 'NOT_FOUND' });
     expect(filter.toProblem(new ForbiddenException('no'))).toMatchObject({ status: 403, detail: 'no' });

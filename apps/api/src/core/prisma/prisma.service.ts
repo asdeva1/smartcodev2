@@ -2,6 +2,7 @@ import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { AppConfig } from '../config/app-config.service';
 import { PrismaClient } from '../../generated/prisma/client';
+import { type ActorContext, type Tx, withActor } from './actor-transaction';
 
 export type DatabaseStatus =
   { status: 'up'; latencyMs: number } | { status: 'down'; error: string } | { status: 'not_configured' };
@@ -30,6 +31,11 @@ export class PrismaService implements OnModuleDestroy {
       this.instance = new PrismaClient({ adapter });
     }
     return this.instance;
+  }
+
+  /** One transaction attributed to the acting employee — see `withActor`. */
+  transaction<T>(context: ActorContext, fn: (tx: Tx) => Promise<T>): Promise<T> {
+    return withActor(this.client, context, fn);
   }
 
   async check(): Promise<DatabaseStatus> {

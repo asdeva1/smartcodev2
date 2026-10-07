@@ -67,6 +67,8 @@ The web app holds **no secrets**: it never talks to the database, S3 credentials
 | `AWS_ROLE_ARN_STAGING` / `AWS_ROLE_ARN_PRODUCTION`   | GitHub OIDC roles (not secrets, but environment-scoped)                            |
 | `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | Only if deploying via CLI instead of Vercel Git integration                        |
 
+`REQUIRE_DATABASE_TESTS=1` (CI only) makes the database test project fail instead of skip when `DATABASE_URL` is absent.
+
 ## Guard rails
 
 - `db:reset` refuses unless `APP_ENV=development` **and** the DB host is local.

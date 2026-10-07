@@ -19,6 +19,8 @@ Status: **Approved (Phase 0)** — final decisions applied
 | Smoke                          | Node script                                       | staging / production URLs                               | Health, login page, auth & RBAC negative checks                                                  |
 | Accessibility                  | axe (Playwright)                                  | key pages                                               | WCAG 2.1 AA basics                                                                               |
 
+Database test project (Phase 2): `pnpm test` in `apps/api` runs a Jest `database` project (`test/db/**/*.db-spec.ts`). Each spec creates its own PostgreSQL schema and replays the real migration SQL, so tests exercise the actual constraints and triggers. Without `DATABASE_URL` the suite skips locally; CI sets `REQUIRE_DATABASE_TESTS=1` so a missing database fails the build. A parity test compares `schema.prisma` with the migrated database (CI also runs `prisma migrate diff`).
+
 ## 2. Mandatory E2E workflow (must pass before production)
 
 ```

@@ -1,6 +1,7 @@
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException, Logger } from '@nestjs/common';
 import { type ErrorCode, type ProblemDetails, WorkflowError } from '@smartcode/shared';
 import type { Request, Response } from 'express';
+import { parseDatabaseRuleViolation } from '../database/rule-errors';
 import { DEFAULT_CODES, ProblemException, STATUS_TITLES } from './problem';
 
 interface PrismaLikeError {
@@ -60,6 +61,9 @@ export class ProblemDetailsFilter implements ExceptionFilter {
         detail,
       );
     }
+    // Business rules enforced by PostgreSQL triggers (Manager-only resolution, immutable history, eligibility …).
+    const rule = parseDatabaseRuleViolation(exception);
+    if (rule) return this.build(rule.status, rule.code, rule.detail);
     if (isPrismaKnownError(exception)) {
       if (exception.code === 'P2002')
         return this.build(409, 'CONFLICT', 'A record with these unique values already exists');

@@ -4,6 +4,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './core/auth/auth.module';
 import { AppConfig } from './core/config/app-config.service';
 import { ConfigModule } from './core/config/config.module';
+import { CoreDataModule } from './core/data/core-data.module';
 import { ProblemDetailsFilter } from './core/errors/problem-details.filter';
 import { LoggingModule } from './core/logging/logging.module';
 import { PrismaModule } from './core/prisma/prisma.module';
@@ -28,6 +29,7 @@ export class AppModule {
           useFactory: (config: AppConfig) => [{ ttl: 60_000, limit: config.get('RATE_LIMIT_PER_MINUTE') }],
         }),
         PrismaModule,
+        CoreDataModule,
         AuthModule,
       ],
       controllers: [HealthController, MetaController],
