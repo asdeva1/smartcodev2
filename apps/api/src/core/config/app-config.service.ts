@@ -26,6 +26,18 @@ export class AppConfig {
       .filter(Boolean);
   }
 
+  /** Cookies are Secure everywhere except plain-HTTP local development/tests. */
+  get secureCookies(): boolean {
+    return this.env.APP_ENV !== 'development' && this.env.APP_ENV !== 'test';
+  }
+
+  /** Absolute link into the web app, built only from configuration (D-06). */
+  webUrl(path: string, query: Record<string, string> = {}): string {
+    const url = new URL(path, `${this.env.WEB_URL.replace(/\/+$/, '')}/`);
+    for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
+    return url.toString();
+  }
+
   get brandAssetBaseUrl(): string {
     return this.env.BRAND_ASSET_BASE_URL ?? `${this.env.APP_URL.replace(/\/+$/, '')}/brand`;
   }
@@ -36,7 +48,8 @@ export class AppConfig {
       | 'REFRESH_TOKEN_IDLE_TTL'
       | 'REFRESH_TOKEN_ABSOLUTE_TTL'
       | 'ACTIVATION_TOKEN_TTL'
-      | 'RESET_TOKEN_TTL',
+      | 'RESET_TOKEN_TTL'
+      | 'LOGIN_LOCK_DURATION',
   ): number {
     return durationToMs(this.env[key]);
   }

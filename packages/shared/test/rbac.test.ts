@@ -80,3 +80,39 @@ describe('RBAC matrix', () => {
     expect(isPermission('chart.delete')).toBe(false);
   });
 });
+
+describe('Phase 3 permissions', () => {
+  it('only the Manager can change roles and assign Login Names', () => {
+    for (const permission of ['employee.changeRole', 'loginName.assign'] as const) {
+      expect(ROLES.filter((role) => can(role, permission))).toEqual(['MANAGER']);
+    }
+  });
+  it('HR can read and update the directory but not create, deactivate or reset', () => {
+    expect(can('HR', 'employee.read')).toBe(true);
+    expect(can('HR', 'employee.update')).toBe(true);
+    for (const p of [
+      'employee.create',
+      'employee.deactivate',
+      'employee.sendActivation',
+      'employee.triggerPasswordReset',
+    ] as const) {
+      expect(can('HR', p)).toBe(false);
+    }
+  });
+  it('Team Lead, Auditor and Coder cannot create employees', () => {
+    for (const role of ['TEAM_LEAD', 'AUDITOR', 'CODER'] as const)
+      expect(can(role, 'employee.create')).toBe(false);
+  });
+  it('Vendor Admin is vendor-scoped for every employee permission it holds', () => {
+    for (const p of [
+      'employee.read',
+      'employee.create',
+      'employee.update',
+      'employee.deactivate',
+      'employee.sendActivation',
+      'employee.triggerPasswordReset',
+    ] as const) {
+      expect(scopeFor('VENDOR_ADMIN', p)).toBe('VENDOR');
+    }
+  });
+});

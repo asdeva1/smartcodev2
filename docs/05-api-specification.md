@@ -129,3 +129,34 @@ X-CSRF-Token: …
 
 Team Lead calling the same endpoint → `403 { code: "FORBIDDEN", detail: "Only a Manager can resolve a review" }`.
 Second resolution of the same audit → `409 { code: "AUDIT_ALREADY_RESOLVED" }`.
+
+## 4. Phase 3 — implemented endpoints (`/api/v1`)
+
+| Method & path                                        | Permission                      | Notes                                                                                  |
+| ---------------------------------------------------- | ------------------------------- | -------------------------------------------------------------------------------------- |
+| `POST /auth/login`                                   | public                          | email + password; sets `sc_at`, `sc_rt`, `sc_csrf`; 200 profile                        |
+| `POST /auth/refresh`                                 | public (refresh cookie)         | rotates the refresh token; reuse revokes the family                                    |
+| `POST /auth/logout`                                  | public                          | revokes the session; always clears cookies                                             |
+| `GET /auth/me`                                       | authenticated                   | `{employee, permissions}`                                                              |
+| `POST /auth/tokens/check`                            | public                          | `{type, token}` → `{valid, fullName?}`                                                 |
+| `POST /auth/activation`                              | public                          | `{token, password}` → 204; PENDING → ACTIVE                                            |
+| `POST /auth/password/forgot`                         | public                          | always 202 `{accepted:true}`                                                           |
+| `POST /auth/password/reset`                          | public                          | `{token, password}` → 204; revokes all sessions                                        |
+| `POST /auth/password/change`                         | authenticated                   | `{currentPassword, newPassword}`; keeps this session                                   |
+| `GET /auth/sessions`, `DELETE /auth/sessions/:id`    | authenticated                   | own sessions only                                                                      |
+| `GET /employees`                                     | `employee.read`                 | filters role, status, vendorId, teamId, projectId, loginName; search `q`; sort; paging |
+| `GET /employees/options`                             | `employee.read`                 | vendors/teams/projects in the caller’s scope (empty for SELF/TEAM readers)             |
+| `POST /employees`                                    | `employee.create`               | creates PENDING_ACTIVATION; `sendActivation` optional                                  |
+| `GET /employees/:id`, `PATCH /employees/:id`         | `employee.read` / `.update`     | out-of-scope → 404                                                                     |
+| `POST /employees/:id/activation-email`               | `employee.sendActivation`       | PENDING only; revokes the previous link                                                |
+| `POST /employees/activation-emails`                  | `employee.sendActivation`       | bulk; reports sent / failed / skipped                                                  |
+| `POST /employees/:id/password-reset`                 | `employee.triggerPasswordReset` | ACTIVE only; never for PENDING                                                         |
+| `POST /employees/:id/deactivate`, `/reactivate`      | `employee.deactivate`           |                                                                                        |
+| `POST /employees/:id/role`                           | `employee.changeRole`           | Manager only                                                                           |
+| `POST /employees/import/preview`, `/import/commit`   | `employee.create`               | CSV text in `{csv, mode}`                                                              |
+| `GET /login-names`, `GET /employees/:id/login-names` | `loginName.read`                | list / history                                                                         |
+| `POST /login-names/assignments`                      | `loginName.assign`              | Manager only; assign or change                                                         |
+| `POST /login-names/release`                          | `loginName.assign`              | Manager only                                                                           |
+| `POST /login-names/import/preview`, `/import/commit` | `loginName.assign`              | Manager only                                                                           |
+
+Unsafe methods authenticated by cookie must send `X-CSRF-Token` equal to the `sc_csrf` cookie and an allowed `Origin`; otherwise 403 `CSRF_FAILED`.

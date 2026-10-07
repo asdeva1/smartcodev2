@@ -88,3 +88,7 @@ Scopes are enforced in the API's repository layer from the authenticated princip
 - `packages/shared/rbac/matrix.ts` is the single definition; a generated test iterates **every route × every role** and asserts allowed / `403` / `404`.
 - Vendor isolation integration suite: seeds two vendors and asserts zero cross-visibility across every list and detail endpoint.
 - Audit-resolution suite: Manager succeeds; Team Lead, Auditor, Coder, Vendor Admin, Group Coach, HR all receive `403`; DB trigger rejects a direct insert with a non-manager resolver.
+
+## Phase 3 additions
+
+New permissions: `employee.sendActivation`, `employee.triggerPasswordReset`, `employee.changeRole` (Manager only), `loginName.read`, `loginName.assign` (Manager only). HR holds `employee.read` and `employee.update` organization-wide and nothing that creates, deactivates, resets or assigns. Vendor Admin holds the employee permissions at `VENDOR` scope only (never role change, never Login Names). Team Lead, Auditor and Coder cannot create employees. `apps/api/test/employee-directory.int-spec.ts` exercises every Phase 3 endpoint against all seven roles and asserts 401 / 403 / allowed exactly as `RBAC_MATRIX` says.

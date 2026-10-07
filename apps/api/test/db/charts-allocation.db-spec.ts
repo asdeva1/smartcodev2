@@ -187,11 +187,12 @@ describeDb('Chart repository & allocation (PostgreSQL)', () => {
         code: PG.invalid,
         message: /not assigned/,
       });
-      // Employee still pending activation.
-      const pending = await fx.employee({ role: 'CODER', active: false });
+      // Employee no longer ACTIVE (a login name can only be assigned to an ACTIVE employee, so lock them afterwards).
+      const pending = await fx.employee({ role: 'CODER' });
       const login2 = await fx.loginName();
       await fx.assignLoginName(login2.id, pending.id, w.manager.id);
       await fx.assignProject(w.project.id, pending.id, 'CODER', w.manager.id);
+      await db.sql(`UPDATE employees SET status = 'LOCKED' WHERE id = $1`, [pending.id]);
       await expectPgError(insertAllocation(w.chart.id, login2.id, pending.id, w.manager.id), {
         code: PG.invalid,
         message: /ACTIVE/,

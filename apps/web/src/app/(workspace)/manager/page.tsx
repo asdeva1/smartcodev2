@@ -1,29 +1,25 @@
+'use client';
+
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import { CHART_STATUSES } from '@smartcode/shared';
-import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
 import { EmptyState } from '@/components/EmptyState';
 import { StatusChip } from '@/components/StatusChip';
 import { env } from '@/env';
+import { RequireSession, useSession } from '@/features/auth/session';
 
-export const metadata: Metadata = { title: 'Manager dashboard' };
-
-/**
- * Phase 1 preview of the workspace shell. Authentication (Phase 3) will gate this route; until then it is
- * only served in non-production environments so nothing unauthenticated reaches production.
- */
-export default function ManagerDashboardPage() {
-  if (env.NEXT_PUBLIC_APP_ENV === 'production') notFound();
-
+function Dashboard() {
+  const { profile, signOut } = useSession();
   return (
     <AppShell
       role="MANAGER"
       title="Manager dashboard"
       currentPath="/manager"
       appEnv={env.NEXT_PUBLIC_APP_ENV}
+      userName={profile.employee.fullName}
+      onSignOut={() => void signOut()}
     >
       <Box sx={{ display: 'grid', gap: 3, maxWidth: 1100 }}>
         <Paper variant="outlined">
@@ -44,5 +40,14 @@ export default function ManagerDashboardPage() {
         </Paper>
       </Box>
     </AppShell>
+  );
+}
+
+/** Signed-in Managers only; the API enforces every action, this only decides what to show. */
+export default function ManagerDashboardPage() {
+  return (
+    <RequireSession role="MANAGER">
+      <Dashboard />
+    </RequireSession>
   );
 }

@@ -94,3 +94,17 @@ BOOTSTRAP_MANAGER_EMAIL=… BOOTSTRAP_MANAGER_NAME=… BOOTSTRAP_MANAGER_EMPLOYE
 ## 5. Authorization hand-off
 
 After authentication, every request passes the permission guard and scope layer described in `03-rbac-matrix.md`. The frontend uses `GET /auth/me` permissions only to show/hide UI; the API re-checks everything.
+
+## 6. Implementation notes (Phase 3)
+
+Implemented in `apps/api/src/core/auth` and `apps/api/src/modules/auth`.
+
+- **Tokens and cookies.** ES256 access JWT (15 min) whose `sid` is the session family; opaque refresh token (SHA-256 in `sessions`, rotated on every use, reuse of a spent token revokes the whole family). Cookies: `sc_at` (httpOnly), `sc_rt` (httpOnly, `Path=/api/v1/auth`), `sc_csrf` (readable; echoed in `X-CSRF-Token`). Bearer callers are exempt from CSRF. In production set `COOKIE_DOMAIN` to the shared parent domain so the web app can read `sc_csrf`.
+- **Every request is checked against the database.** `AuthGuard` → `SessionService.verify`: the session family must be live, the employee must be ACTIVE, and role and vendor are re-read. Logout, deactivation, a password change/reset and a role change therefore apply to the very next request, not when the 15-minute token expires.
+- **Passwords.** Argon2id. Policy (`packages/shared/password-policy`): 12–128 characters, not a common password, must not contain the person’s name parts, email name or Employee ID; the web form and the API apply the same function.
+- **Sign-in.** Email + password only; a Login Name is rejected as input. PENDING_ACTIVATION always gets the generic 401 (the response never says the account exists). INACTIVE with the correct password gets 403 `ACCOUNT_UNAVAILABLE`. Five failures lock the credential for 15 minutes (429); a per-email+IP failure limiter (in-memory per API task, Redis later) sits on top, and only failures are counted so an office behind one address can still sign in.
+- **Links.** Activation (72 h) and reset (30 min) tokens are 256-bit random, stored as SHA-256, consumed atomically (`UPDATE … WHERE used_at IS NULL`), and issuing a new link revokes the live one. Any bad link — unknown, used, revoked, expired, wrong type, wrong account state — answers the same 400 `TOKEN_INVALID`. `POST /auth/tokens/check` answers `{valid}` so the page can say so before the person types.
+- **Reset.** Only ACTIVE accounts. `POST /auth/password/forgot` always answers 202 `{accepted:true}` and sends nothing to unknown, pending or inactive addresses; a pending person must use the activation link. A Manager may send a reset link (`employee.triggerPasswordReset`) but never sets or sees a password.
+- **Revocation.** Password change keeps the current session and revokes the others; reset and activation revoke all; deactivation revokes all.
+- **Bootstrap.** `pnpm bootstrap:manager` (env: `BOOTSTRAP_MANAGER_EMAIL`, `_NAME`, `_EMPLOYEE_ID`): creates a PENDING Manager and emails the activation link. Re-running after activation does nothing; re-running while pending re-issues the link; a pending Manager under a different email is refused rather than duplicated. `--print-link` is local-development only and refused when `APP_ENV` is staging or production. The database additionally refuses to demote or deactivate the last active Manager.
+- **Mail.** `MailService` renders the branded templates in `packages/email-templates` and builds every link from `WEB_URL`. Failure to send never fails a committed operation; only the category and outcome are logged, never the link or address.

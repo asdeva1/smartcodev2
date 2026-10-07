@@ -206,7 +206,7 @@ describeDb('Employee identity & SmartClues Login Names (PostgreSQL)', () => {
           `INSERT INTO login_name_assignments (id, login_name_id, employee_id, assigned_by_id) VALUES (gen_random_uuid(), $1, $2, $3)`,
           [other.id, coder.id, manager.id],
         ),
-        { code: PG.invalid, message: /not eligible/ },
+        { code: PG.invalid, message: /ACTIVE employee/ },
       );
     });
 

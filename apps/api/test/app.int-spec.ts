@@ -146,10 +146,28 @@ describe('API foundation (HTTP)', () => {
       expect(res.body).toEqual({ resolved: 'audit-1' });
     });
 
-    it('accepts the access token from the httpOnly cookie', async () => {
+    it('accepts the access token from the httpOnly cookie when the CSRF token is echoed', async () => {
       await resolve()
-        .set('Cookie', `sc_at=${await tokenFor(app, 'MANAGER')}`)
+        .set('Cookie', `sc_at=${await tokenFor(app, 'MANAGER')}; sc_csrf=csrf-test-value`)
+        .set('X-CSRF-Token', 'csrf-test-value')
         .expect(201);
+    });
+
+    it('rejects a cookie-authenticated unsafe request without the CSRF header (403 CSRF_FAILED)', async () => {
+      const res = await resolve()
+        .set('Cookie', `sc_at=${await tokenFor(app, 'MANAGER')}; sc_csrf=csrf-test-value`)
+        .expect(403);
+      expect(res.body.code).toBe('CSRF_FAILED');
+    });
+
+    it('rejects a mismatched CSRF header and a disallowed Origin', async () => {
+      const cookie = `sc_at=${await tokenFor(app, 'MANAGER')}; sc_csrf=csrf-test-value`;
+      await resolve().set('Cookie', cookie).set('X-CSRF-Token', 'other').expect(403);
+      await resolve()
+        .set('Cookie', cookie)
+        .set('X-CSRF-Token', 'csrf-test-value')
+        .set('Origin', 'https://evil.example.test')
+        .expect(403);
     });
 
     it('D-03: only Manager allocates charts', async () => {

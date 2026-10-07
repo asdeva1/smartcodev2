@@ -27,6 +27,7 @@
     "db:reset": "pnpm --filter @smartcode/api db:reset",
     "db:health": "pnpm --filter @smartcode/api db:health",
     "db:verify": "pnpm --filter @smartcode/api db:verify",
+    "bootstrap:manager": "pnpm --filter @smartcode/api bootstrap:manager",
     "dev:services": "docker compose up -d",
     "dev:services:down": "docker compose down"
   },

@@ -12,30 +12,78 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * Thin fetch wrapper for the SmartCode API. Cookies (httpOnly session) are always sent; the browser never
- * sees tokens. Phase 3 adds the CSRF header and silent refresh.
- */
-export async function apiFetch<T>(path: string, init: RequestInit = {}, base = API_BASE): Promise<T> {
-  let response: Response;
+const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+/** Paths that must never trigger a silent refresh (they ARE the session mechanism, or are public). */
+const NO_REFRESH = [
+  '/auth/login',
+  '/auth/refresh',
+  '/auth/logout',
+  '/auth/activation',
+  '/auth/password/',
+  '/auth/tokens/',
+];
+
+/** The double-submit CSRF value the API set in a readable cookie at sign-in. */
+export function readCsrfToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = /(?:^|;\s*)sc_csrf=([^;]+)/.exec(document.cookie);
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+function unavailable(): ApiError {
+  return new ApiError({
+    type: 'about:blank',
+    title: 'Service Unavailable',
+    status: 0,
+    code: 'SERVICE_UNAVAILABLE',
+    detail: 'SmartCode could not reach the server. Check your connection and try again.',
+  });
+}
+
+async function send(path: string, init: RequestInit, base: string): Promise<Response> {
+  const method = (init.method ?? 'GET').toUpperCase();
+  const csrf = UNSAFE.has(method) ? readCsrfToken() : null;
   try {
-    response = await fetch(`${base}${path}`, {
+    return await fetch(`${base}${path}`, {
       ...init,
       credentials: 'include',
       headers: {
         accept: 'application/json',
         ...(init.body ? { 'content-type': 'application/json' } : {}),
+        ...(csrf ? { 'x-csrf-token': csrf } : {}),
         ...init.headers,
       },
     });
   } catch {
-    throw new ApiError({
-      type: 'about:blank',
-      title: 'Service Unavailable',
-      status: 0,
-      code: 'SERVICE_UNAVAILABLE',
-      detail: 'SmartCode could not reach the server. Check your connection and try again.',
+    throw unavailable();
+  }
+}
+
+let refreshing: Promise<boolean> | null = null;
+/** One refresh at a time; every waiting request shares the outcome. */
+function refreshSession(base: string): Promise<boolean> {
+  refreshing ??= send('/auth/refresh', { method: 'POST' }, base)
+    .then((r) => r.ok)
+    .catch(() => false)
+    .finally(() => {
+      refreshing = null;
     });
+  return refreshing;
+}
+
+/**
+ * Thin fetch wrapper for the SmartCode API. Cookies (httpOnly session) are always sent; the browser never sees
+ * tokens. Unsafe requests carry the CSRF header; an expired access token is renewed once, silently, and the
+ * request is retried. Authentication problems that survive that are returned to the caller.
+ */
+export async function apiFetch<T>(path: string, init: RequestInit = {}, base = API_BASE): Promise<T> {
+  let response = await send(path, init, base);
+  if (
+    response.status === 401 &&
+    !NO_REFRESH.some((p) => path.startsWith(p)) &&
+    (await refreshSession(base))
+  ) {
+    response = await send(path, init, base);
   }
   const isJson = (response.headers.get('content-type') ?? '').includes('json');
   const body: unknown = isJson ? await response.json() : null;

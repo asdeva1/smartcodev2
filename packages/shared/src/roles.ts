@@ -30,3 +30,14 @@ export const VENDOR_STAFF_ROLES: readonly Role[] = ['TEAM_LEAD', 'AUDITOR', 'COD
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value);
 }
+
+/**
+ * Roles that take part in production/audit operations and may therefore hold a SmartClues Login Name
+ * (Phase 3 decision). Manager, HR and Vendor Admin never receive one. Enforced in PostgreSQL as well.
+ * A Login Name is an operational identifier — it is never an authentication identity.
+ */
+export const LOGIN_NAME_ELIGIBLE_ROLES: readonly Role[] = ['CODER', 'AUDITOR', 'TEAM_LEAD', 'GROUP_COACH'];
+
+export function isLoginNameEligibleRole(role: Role): boolean {
+  return LOGIN_NAME_ELIGIBLE_ROLES.includes(role);
+}

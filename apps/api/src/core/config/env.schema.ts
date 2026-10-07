@@ -39,6 +39,20 @@ export const envSchema = z
     ACTIVATION_TOKEN_TTL: duration.default('72h'),
     RESET_TOKEN_TTL: duration.default('30m'),
 
+    LOGIN_MAX_FAILED_ATTEMPTS: z.coerce.number().int().min(3).max(20).default(5),
+    LOGIN_LOCK_DURATION: duration.default('15m'),
+
+    /**
+     * Outbound email. `ses` in AWS; `smtp` for a local catcher (Mailpit); `file` writes messages to disk and
+     * `memory` keeps them in-process — both are for development/tests only and refused when deployed.
+     */
+    MAIL_TRANSPORT: z.enum(['ses', 'smtp', 'file', 'memory']).default('file'),
+    MAIL_FROM: optionalString,
+    SMTP_HOST: optionalString,
+    SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(1025),
+    MAIL_FILE_DIR: optionalString,
+    AWS_REGION: optionalString,
+
     RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(300),
     RATE_LIMIT_LOGIN_PER_15M: z.coerce.number().int().min(1).default(5),
   })
@@ -60,6 +74,29 @@ export const envSchema = z
         if (!env[key].startsWith('https://')) {
           ctx.addIssue({ code: 'custom', path: [key], message: `${key} must use https in ${env.APP_ENV}` });
         }
+      }
+    }
+    if (deployed) {
+      if (env.MAIL_TRANSPORT !== 'ses') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['MAIL_TRANSPORT'],
+          message: `MAIL_TRANSPORT must be "ses" in ${env.APP_ENV}`,
+        });
+      }
+      if (!env.MAIL_FROM) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['MAIL_FROM'],
+          message: `MAIL_FROM is required in ${env.APP_ENV}`,
+        });
+      }
+      if (!env.AWS_REGION) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['AWS_REGION'],
+          message: `AWS_REGION is required in ${env.APP_ENV}`,
+        });
       }
     }
     if (env.DATABASE_URL && env.APP_ENV === 'production' && /localhost|127\.0\.0\.1/.test(env.DATABASE_URL)) {

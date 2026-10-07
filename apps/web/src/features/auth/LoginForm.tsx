@@ -7,7 +7,9 @@ import TextField from '@mui/material/TextField';
 import { loginRequestSchema } from '@smartcode/shared';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
+import NextLink from 'next/link';
 import { ApiError, apiFetch } from '@/lib/api';
+import { type Profile, homeFor } from './session';
 
 type FieldErrors = Partial<Record<'email' | 'password', string>>;
 
@@ -55,8 +57,11 @@ export function LoginForm() {
     setFieldErrors({});
     setSubmitting(true);
     try {
-      await apiFetch('/auth/login', { method: 'POST', body: JSON.stringify(parsed.data) });
-      router.push('/');
+      const profile = await apiFetch<Partial<Profile>>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(parsed.data),
+      });
+      router.push(profile.employee ? homeFor(profile.employee.role) : '/');
     } catch (error) {
       setFormError(loginErrorMessage(error));
     } finally {
@@ -96,6 +101,9 @@ export function LoginForm() {
       />
       <Button type="submit" variant="contained" size="large" disabled={submitting}>
         {submitting ? 'Signing in…' : 'Sign in'}
+      </Button>
+      <Button component={NextLink} href="/account/forgot-password" variant="text">
+        Forgot your password?
       </Button>
     </Box>
   );

@@ -6,38 +6,43 @@ All configuration is validated at start-up (zod schema in `apps/api/src/core/con
 
 ## API & worker (`apps/api`)
 
-| Variable                                                | Secret   | Example / default                                    | Purpose                                                        |
-| ------------------------------------------------------- | -------- | ---------------------------------------------------- | -------------------------------------------------------------- |
-| `APP_ENV`                                               | no       | `development` \| `staging` \| `production`           | Environment guard rails                                        |
-| `NODE_ENV`                                              | no       | `production`                                         |                                                                |
-| `PORT`                                                  | no       | `4000`                                               | HTTP port (container)                                          |
-| `APP_MODE`                                              | no       | `api` \| `worker` \| `task`                          | Which entrypoint the image runs                                |
-| `DATABASE_URL`                                          | **yes**  | `postgresql://…?sslmode=require&connection_limit=10` | Runtime pool                                                   |
-| `DATABASE_MIGRATION_URL`                                | **yes**  | separate role with DDL rights                        | Used only by the migrate task                                  |
-| `DATABASE_POOL_MAX`                                     | no       | `10`                                                 | Connections per process (tasks × pool ≤ 70 % of RDS max)       |
-| `REDIS_URL`                                             | **yes**  | `rediss://…`                                         | Queues, rate limit, SSE                                        |
-| `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY`                    | **yes**  | ES256 PEM                                            | Access-token signing                                           |
-| `JWT_KEY_ID`                                            | no       | `2026-10`                                            | Key rotation                                                   |
-| `ACCESS_TOKEN_TTL`                                      | no       | `15m`                                                |                                                                |
-| `REFRESH_TOKEN_IDLE_TTL` / `REFRESH_TOKEN_ABSOLUTE_TTL` | no       | `12h` / `7d`                                         |                                                                |
-| `ACTIVATION_TOKEN_TTL` / `RESET_TOKEN_TTL`              | no       | `72h` / `30m`                                        |                                                                |
-| `COOKIE_DOMAIN`                                         | no       | empty in dev                                         | Shared parent domain (set when domains are known)              |
-| `WEB_URL`                                               | no       | `http://localhost:3000`                              | Origin of the web app (CORS default, redirects)                |
-| `API_URL`                                               | no       | `http://localhost:4000`                              | Public base URL of this API                                    |
-| `APP_URL`                                               | no       | `http://localhost:3000`                              | Canonical product URL used in emails/links (activation, reset) |
-| `CORS_ALLOWED_ORIGINS`                                  | no       | defaults to `WEB_URL`                                | Comma-separated allow-list                                     |
-| `AWS_REGION`                                            | no       | per environment                                      |                                                                |
-| `S3_UPLOADS_BUCKET` / `S3_REPORTS_BUCKET`               | no       | `smartcode-prod-uploads`                             |                                                                |
-| `S3_ENDPOINT`                                           | no       | dev only (MinIO)                                     |                                                                |
-| `SES_FROM_EMAIL`                                        | no       | `SmartCode <no-reply@example.com>`                   |                                                                |
-| `SES_CONFIGURATION_SET`                                 | no       | `smartcode-prod`                                     | Bounce tracking                                                |
-| `SMTP_URL`                                              | no       | dev only (Mailpit)                                   | Local email capture                                            |
-| `BRAND_ASSET_BASE_URL`                                  | no       | `${APP_URL}/brand`                                   | Absolute logo URL for emails/PDFs                              |
-| `LOG_LEVEL`                                             | no       | `info`                                               |                                                                |
-| `RATE_LIMIT_PER_MINUTE`                                 | no       | `300`                                                | General per-client API rate limit                              |
-| `RATE_LIMIT_LOGIN_PER_15M`                              | no       | `5`                                                  |                                                                |
-| `BOOTSTRAP_MANAGER_EMAIL` / `_NAME` / `_EMPLOYEE_ID`    | no (PII) | —                                                    | Only for the one-off bootstrap task                            |
-| `SENTRY_DSN` / `OTEL_EXPORTER_OTLP_ENDPOINT`            | optional | —                                                    | Error tracking / tracing (optional, D-18)                      |
+| Variable                                                                     | Secret   | Example / default                                    | Purpose                                                                                |
+| ---------------------------------------------------------------------------- | -------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `APP_ENV`                                                                    | no       | `development` \| `staging` \| `production`           | Environment guard rails                                                                |
+| `NODE_ENV`                                                                   | no       | `production`                                         |                                                                                        |
+| `PORT`                                                                       | no       | `4000`                                               | HTTP port (container)                                                                  |
+| `APP_MODE`                                                                   | no       | `api` \| `worker` \| `task`                          | Which entrypoint the image runs                                                        |
+| `DATABASE_URL`                                                               | **yes**  | `postgresql://…?sslmode=require&connection_limit=10` | Runtime pool                                                                           |
+| `DATABASE_MIGRATION_URL`                                                     | **yes**  | separate role with DDL rights                        | Used only by the migrate task                                                          |
+| `DATABASE_POOL_MAX`                                                          | no       | `10`                                                 | Connections per process (tasks × pool ≤ 70 % of RDS max)                               |
+| `REDIS_URL`                                                                  | **yes**  | `rediss://…`                                         | Queues, rate limit, SSE                                                                |
+| `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY`                                         | **yes**  | ES256 PEM                                            | Access-token signing                                                                   |
+| `JWT_KEY_ID`                                                                 | no       | `2026-10`                                            | Key rotation                                                                           |
+| `ACCESS_TOKEN_TTL`                                                           | no       | `15m`                                                |                                                                                        |
+| `REFRESH_TOKEN_IDLE_TTL` / `REFRESH_TOKEN_ABSOLUTE_TTL`                      | no       | `12h` / `7d`                                         |                                                                                        |
+| `ACTIVATION_TOKEN_TTL` / `RESET_TOKEN_TTL`                                   | no       | `72h` / `30m`                                        |                                                                                        |
+| `COOKIE_DOMAIN`                                                              | no       | empty in dev                                         | Shared parent domain (set when domains are known)                                      |
+| `WEB_URL`                                                                    | no       | `http://localhost:3000`                              | Origin of the web app (CORS default, redirects)                                        |
+| `API_URL`                                                                    | no       | `http://localhost:4000`                              | Public base URL of this API                                                            |
+| `APP_URL`                                                                    | no       | `http://localhost:3000`                              | Canonical product URL used in emails/links (activation, reset)                         |
+| `CORS_ALLOWED_ORIGINS`                                                       | no       | defaults to `WEB_URL`                                | Comma-separated allow-list                                                             |
+| `AWS_REGION`                                                                 | no       | per environment                                      |                                                                                        |
+| `S3_UPLOADS_BUCKET` / `S3_REPORTS_BUCKET`                                    | no       | `smartcode-prod-uploads`                             |                                                                                        |
+| `S3_ENDPOINT`                                                                | no       | dev only (MinIO)                                     |                                                                                        |
+| `MAIL_TRANSPORT`                                                             | no       | `file` (dev) / `ses` (deployed)                      | `ses`, `smtp`, `file`, `memory`. `file` and `memory` are refused in staging/production |
+| `MAIL_FROM`                                                                  | deployed | —                                                    | Sender, e.g. `SmartCode <no-reply@…>`; required when deployed                          |
+| `SMTP_HOST` / `SMTP_PORT`                                                    | no       | `localhost` / `1025`                                 | Local email catcher (Mailpit) for `MAIL_TRANSPORT=smtp`                                |
+| `MAIL_FILE_DIR`                                                              | no       | `.mail-outbox`                                       | Where `MAIL_TRANSPORT=file` writes messages (local/E2E only)                           |
+| `ACTIVATION_TOKEN_TTL` / `RESET_TOKEN_TTL`                                   | no       | `72h` / `30m`                                        | Link lifetimes                                                                         |
+| `ACCESS_TOKEN_TTL` / `REFRESH_TOKEN_IDLE_TTL` / `REFRESH_TOKEN_ABSOLUTE_TTL` | no       | `15m` / `12h` / `7d`                                 | Session lifetimes                                                                      |
+| `LOGIN_MAX_FAILED_ATTEMPTS` / `LOGIN_LOCK_DURATION`                          | no       | `5` / `15m`                                          | Credential lockout                                                                     |
+| `COOKIE_DOMAIN`                                                              | deployed | —                                                    | Shared parent domain so the web app can read the CSRF cookie the API sets              |
+| `BRAND_ASSET_BASE_URL`                                                       | no       | `${APP_URL}/brand`                                   | Absolute logo URL for emails/PDFs                                                      |
+| `LOG_LEVEL`                                                                  | no       | `info`                                               |                                                                                        |
+| `RATE_LIMIT_PER_MINUTE`                                                      | no       | `300`                                                | General per-client API rate limit                                                      |
+| `RATE_LIMIT_LOGIN_PER_15M`                                                   | no       | `5`                                                  |                                                                                        |
+| `BOOTSTRAP_MANAGER_EMAIL` / `_NAME` / `_EMPLOYEE_ID`                         | no (PII) | —                                                    | Only for the one-off bootstrap task                                                    |
+| `SENTRY_DSN` / `OTEL_EXPORTER_OTLP_ENDPOINT`                                 | optional | —                                                    | Error tracking / tracing (optional, D-18)                                              |
 
 ## Web (`apps/web`)
 

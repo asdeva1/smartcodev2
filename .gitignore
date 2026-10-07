@@ -37,3 +37,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# local development mail outbox (MAIL_TRANSPORT=file)
+.mail-outbox/

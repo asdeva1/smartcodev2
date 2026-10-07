@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import { CHART_STATUSES } from '@smartcode/shared';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AppShell } from '@/components/AppShell';
 import { BrandLogo } from '@/components/BrandLogo';
 import { EmptyState } from '@/components/EmptyState';
@@ -56,10 +56,33 @@ describe('pages show the logo', () => {
     expect(screen.getByLabelText(/work email/i)).toBeInTheDocument();
   });
 
-  it('manager workspace preview renders the shell with the logo and empty state', () => {
+  it('manager workspace renders the shell with the logo and empty state once signed in', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            employee: {
+              id: 'e1',
+              employeeCode: 'MGR-1',
+              fullName: 'Test Manager',
+              email: 'm@example.test',
+              role: 'MANAGER',
+              status: 'ACTIVE',
+              vendorId: null,
+              loginName: null,
+              loginNameEligible: false,
+            },
+            permissions: { 'dashboard.manager': 'ORG', 'employee.read': 'ORG' },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    );
     renderWithTheme(<ManagerDashboardPage />);
+    expect(await screen.findByText('No production data yet')).toBeInTheDocument();
     expect(screen.getAllByAltText(/SmartCode/).length).toBeGreaterThan(0);
-    expect(screen.getByText('No production data yet')).toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 });
 

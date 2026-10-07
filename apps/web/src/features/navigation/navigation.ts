@@ -91,10 +91,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {
     key: 'login-names',
     label: 'Login names',
-    href: '/login-names',
+    href: '/manager/employees?tab=login-names',
     permission: 'loginName.assign',
     group: 'Operations',
-    available: false,
+    available: true,
   },
   {
     key: 'reviews',
@@ -115,10 +115,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {
     key: 'employees',
     label: 'Employee directory',
-    href: '/employees',
+    href: '/manager/employees',
     permission: 'employee.read',
     group: 'People',
-    available: false,
+    available: true,
     requiresBroaderThanSelf: true,
   },
   {

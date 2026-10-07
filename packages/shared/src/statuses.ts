@@ -15,7 +15,12 @@ export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export const ALLOCATION_STATUSES = ['ACTIVE', 'ENDED'] as const;
 export type AllocationStatus = (typeof ALLOCATION_STATUSES)[number];
 
-export const LOGIN_NAME_END_REASONS = ['REASSIGNED', 'DEACTIVATED', 'EMPLOYEE_INACTIVE'] as const;
+export const LOGIN_NAME_END_REASONS = [
+  'REASSIGNED',
+  'DEACTIVATED',
+  'EMPLOYEE_INACTIVE',
+  'ROLE_CHANGED',
+] as const;
 export type LoginNameEndReason = (typeof LOGIN_NAME_END_REASONS)[number];
 
 export const EMPLOYEE_STATUSES = ['PENDING_ACTIVATION', 'ACTIVE', 'INACTIVE', 'LOCKED'] as const;

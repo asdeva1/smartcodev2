@@ -10,6 +10,7 @@ export const PERMISSIONS = [
   'employee.create',
   'employee.update',
   'employee.deactivate',
+  'employee.changeRole',
   'employee.sendActivation',
   'employee.triggerPasswordReset',
   'loginName.read',
@@ -165,6 +166,7 @@ export const RBAC_MATRIX: Readonly<Record<Role, Grants>> = {
 
 /** Permissions only a Manager may ever hold. Enforced by tests so the matrix can't drift. */
 export const MANAGER_ONLY_PERMISSIONS: readonly Permission[] = [
+  'employee.changeRole',
   'audit.resolveReview',
   'chart.allocate',
   'chart.import',

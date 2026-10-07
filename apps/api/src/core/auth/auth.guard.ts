@@ -4,18 +4,22 @@ import type { Request } from 'express';
 import { ProblemException } from '../errors/problem';
 import { IS_PUBLIC_KEY, type RequestWithPrincipal } from './decorators';
 import { ACCESS_TOKEN_COOKIE, PERMISSIONS_VERSION } from './principal';
+import { SessionVerifier } from './session.service';
 import { TokenService } from './token.service';
 
 /**
  * Global authentication guard. Every route requires a valid access token unless marked @Public().
  * Token source: `sc_at` httpOnly cookie (web) or `Authorization: Bearer` (mobile V2 / scripts).
- * Phase 3 adds the session-revocation and employee-status check (Redis-cached).
+ * After the signature check the session must still be live and the employee ACTIVE (database check), and the
+ * role/vendor are re-read from the database — so deactivation, logout, password reset and role changes apply to the
+ * very next request, not at token expiry.
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly tokens: TokenService,
+    private readonly sessions: SessionVerifier,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -34,7 +38,9 @@ export class AuthGuard implements CanActivate {
       if (principal.permissionsVersion !== PERMISSIONS_VERSION) {
         throw new ProblemException(401, 'UNAUTHENTICATED', 'Session must be renewed');
       }
-      req.principal = principal;
+      const live = await this.sessions.verify(principal);
+      if (!live) throw new ProblemException(401, 'UNAUTHENTICATED', 'Invalid or expired session');
+      req.principal = live;
       return true;
     } catch (e) {
       if (e instanceof ProblemException) throw e;

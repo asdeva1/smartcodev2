@@ -34,8 +34,12 @@ export class PrismaService implements OnModuleDestroy {
   }
 
   /** One transaction attributed to the acting employee — see `withActor`. */
-  transaction<T>(context: ActorContext, fn: (tx: Tx) => Promise<T>): Promise<T> {
-    return withActor(this.client, context, fn);
+  transaction<T>(
+    context: ActorContext,
+    fn: (tx: Tx) => Promise<T>,
+    options: { timeoutMs?: number } = {},
+  ): Promise<T> {
+    return withActor(this.client, context, fn, options);
   }
 
   async check(): Promise<DatabaseStatus> {

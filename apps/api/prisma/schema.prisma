@@ -96,6 +96,7 @@ enum LoginNameEndReason {
   REASSIGNED
   DEACTIVATED
   EMPLOYEE_INACTIVE
+  ROLE_CHANGED
 
   @@map("login_name_end_reason")
 }

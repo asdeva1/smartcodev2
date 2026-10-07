@@ -94,6 +94,11 @@ jobs:
       NEXT_PUBLIC_APP_ENV: test
       NEXT_PUBLIC_API_URL: http://localhost:4000
       NEXT_PUBLIC_APP_URL: http://localhost:3000
+      # Emails go to files so the tests can open the activation / reset links (stand-in for Mailpit).
+      MAIL_TRANSPORT: file
+      MAIL_FILE_DIR: ${{ github.workspace }}/.e2e-mail
+      E2E_MAIL_DIR: ${{ github.workspace }}/.e2e-mail
+      E2E_MANAGER_EMAIL: e2e.manager@example.test
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -104,6 +109,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @smartcode/e2e install:browsers
       - run: pnpm db:generate && pnpm db:migrate && pnpm db:seed
+      - name: Bootstrap the first Manager through the activation workflow (no password exists anywhere)
+        run: pnpm bootstrap:manager
+        env:
+          BOOTSTRAP_MANAGER_EMAIL: e2e.manager@example.test
+          BOOTSTRAP_MANAGER_NAME: E2E Manager
+          BOOTSTRAP_MANAGER_EMPLOYEE_ID: MGR-E2E
       - run: pnpm build
       - name: Run E2E against the built API and web app
         run: pnpm test:e2e

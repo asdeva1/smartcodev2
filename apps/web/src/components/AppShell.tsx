@@ -2,6 +2,7 @@
 
 import MenuIcon from '@mui/icons-material/Menu';
 import AppBar from '@mui/material/AppBar';
+import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
@@ -25,6 +26,9 @@ export interface AppShellProps {
   title: string;
   currentPath: string;
   appEnv: string;
+  /** Signed-in person; shown in the header with a sign-out action. */
+  userName?: string;
+  onSignOut?: () => void;
   children: ReactNode;
 }
 
@@ -92,7 +96,7 @@ function Sidebar({ role, currentPath }: { role: Role; currentPath: string }) {
 }
 
 /** Authenticated workspace frame: logo sidebar (role-aware menu) + header. Used by every role's pages. */
-export function AppShell({ role, title, currentPath, appEnv, children }: AppShellProps) {
+export function AppShell({ role, title, currentPath, appEnv, userName, onSignOut, children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const width = tokens.sidebarWidth;
   const paperSx = {
@@ -145,8 +149,13 @@ export function AppShell({ role, title, currentPath, appEnv, children }: AppShel
             </Typography>
             <EnvironmentBadge appEnv={appEnv} />
             <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
-              {ROLE_LABELS[role]}
+              {userName ? `${userName} · ${ROLE_LABELS[role]}` : ROLE_LABELS[role]}
             </Typography>
+            {onSignOut && (
+              <Button size="small" variant="outlined" onClick={onSignOut}>
+                Sign out
+              </Button>
+            )}
           </Toolbar>
         </AppBar>
         <Box component="main" id="main" sx={{ flex: 1, p: { xs: 2, md: 4 } }}>

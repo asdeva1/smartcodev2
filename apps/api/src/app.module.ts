@@ -6,9 +6,12 @@ import { AppConfig } from './core/config/app-config.service';
 import { ConfigModule } from './core/config/config.module';
 import { CoreDataModule } from './core/data/core-data.module';
 import { ProblemDetailsFilter } from './core/errors/problem-details.filter';
+import { MailModule } from './core/mail/mail.module';
 import { LoggingModule } from './core/logging/logging.module';
 import { PrismaModule } from './core/prisma/prisma.module';
 import { HealthController } from './modules/health/health.controller';
+import { AuthApiModule } from './modules/auth/auth.module';
+import { EmployeesModule } from './modules/employees/employees.module';
 import { MetaController } from './modules/meta/meta.controller';
 
 /**
@@ -30,7 +33,10 @@ export class AppModule {
         }),
         PrismaModule,
         CoreDataModule,
+        MailModule,
         AuthModule,
+        AuthApiModule,
+        EmployeesModule,
       ],
       controllers: [HealthController, MetaController],
       providers: [
