@@ -124,18 +124,19 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {
     key: 'vendors',
     label: 'Vendors',
-    href: '/vendors',
-    permission: 'vendor.manage',
+    href: '/manager/vendors',
+    permission: 'vendor.read',
     group: 'People',
-    available: false,
+    available: true,
   },
   {
     key: 'teams',
     label: 'Teams',
-    href: '/teams',
-    permission: 'team.manage',
+    href: '/manager/teams',
+    permission: 'team.read',
     group: 'People',
-    available: false,
+    available: true,
+    requiresBroaderThanSelf: true,
   },
   {
     key: 'reports',
@@ -156,10 +157,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {
     key: 'settings',
     label: 'Settings',
-    href: '/settings',
+    href: '/manager/settings',
     permission: 'settings.manage',
     group: 'Administration',
-    available: false,
+    available: true,
   },
 ];
 

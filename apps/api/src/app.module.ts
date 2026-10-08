@@ -13,6 +13,9 @@ import { HealthController } from './modules/health/health.controller';
 import { AuthApiModule } from './modules/auth/auth.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { MetaController } from './modules/meta/meta.controller';
+import { OrganizationModule } from './modules/organization/organization.module';
+import { TeamsModule } from './modules/teams/teams.module';
+import { VendorsModule } from './modules/vendors/vendors.module';
 
 /**
  * Root module. Business modules are registered here phase by phase (docs/14-implementation-roadmap.md).
@@ -37,6 +40,9 @@ export class AppModule {
         AuthModule,
         AuthApiModule,
         EmployeesModule,
+        OrganizationModule,
+        VendorsModule,
+        TeamsModule,
       ],
       controllers: [HealthController, MetaController],
       providers: [
