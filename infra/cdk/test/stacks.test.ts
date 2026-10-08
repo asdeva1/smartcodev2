@@ -172,6 +172,19 @@ describe('staging', () => {
     expect(() => buildApp(new App(), { env: 'production', backupRetentionDays: 1 })).toThrow(/production/);
   });
 
+  it('can put an https CloudFront front door in front of the ALB (staging stop-gap), never production', () => {
+    const { api } = buildApp(new App(), { env: 'staging', imageTag: 'test', cloudFrontApi: true });
+    const template = Template.fromStack(api);
+    template.resourceCountIs('AWS::CloudFront::Distribution', 1);
+    template.hasResourceProperties('AWS::CloudFront::Distribution', {
+      DistributionConfig: Match.objectLike({
+        DefaultCacheBehavior: Match.objectLike({ ViewerProtocolPolicy: 'https-only' }),
+      }),
+    });
+    const prod = buildApp(new App(), { env: 'production', imageTag: 'test', cloudFrontApi: true });
+    Annotations.fromStack(prod.api).hasError('*', Match.stringLikeRegexp('stop-gap'));
+  });
+
   it('rejects unknown environments', () => {
     expect(() => buildApp(new App(), { env: 'dev' })).toThrow(/Unknown deployment environment/);
   });

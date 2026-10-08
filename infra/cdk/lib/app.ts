@@ -18,6 +18,8 @@ export interface BuildOptions {
   desiredCount?: number;
   /** Staging only: new AWS accounts on the free plan cap RDS backups at 1 day. Rejected for production. */
   backupRetentionDays?: number;
+  /** Staging only: https API URL via CloudFront until a domain and ACM certificate exist. */
+  cloudFrontApi?: boolean;
 }
 
 /** Builds every stack for one environment. Used by bin/smartcode.ts and the assertion tests. */
@@ -51,6 +53,7 @@ export function buildApp(app: App, options: BuildOptions) {
     mailFrom: options.mailFrom,
     cookieDomain: options.cookieDomain,
     desiredCountOverride: options.desiredCount,
+    cloudFrontApi: options.cloudFrontApi,
     // D-06: domains are configuration. Placeholders until the real domains are decided.
     urls: {
       web: webUrl,
