@@ -98,6 +98,8 @@ describe('navigation', () => {
     expect(navigationFor('MANAGER').map((i) => i.label)).toContain('Projects');
     expect(navigationFor('MANAGER').map((i) => i.label)).not.toContain('Clients & projects');
     expect(navigationFor('CODER').map((i) => i.label)).toEqual(expect.arrayContaining(['My charts']));
+    // The Manager holds every permission but has no personal allotment.
+    expect(navigationFor('MANAGER').map((i) => i.label)).not.toContain('My charts');
     expect(navigationFor('TEAM_LEAD').find((i) => i.key === 'projects')?.available).toBe(true);
   });
 });

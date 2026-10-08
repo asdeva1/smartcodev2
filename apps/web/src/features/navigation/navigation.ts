@@ -13,6 +13,8 @@ export interface NavItem {
   available: boolean;
   /** Hide when the role only holds the permission for its own records (e.g. a coder's own profile). */
   requiresBroaderThanSelf?: boolean;
+  /** Personal pages (a coder's own charts) are shown to that role only, even though the Manager holds every permission. */
+  onlyRoles?: readonly Role[];
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -55,6 +57,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permission: 'dashboard.coder',
     group: 'Overview',
     available: true,
+    onlyRoles: ['CODER'],
   },
   {
     key: 'auditor-home',
@@ -166,6 +169,7 @@ export const NAV_GROUP_ORDER: readonly NavItem['group'][] = [
 
 export function navigationFor(role: Role): NavItem[] {
   return NAV_ITEMS.filter((item) => {
+    if (item.onlyRoles && !item.onlyRoles.includes(role)) return false;
     const scope = scopeFor(role, item.permission);
     return scope !== null && !(item.requiresBroaderThanSelf && scope === 'SELF');
   });

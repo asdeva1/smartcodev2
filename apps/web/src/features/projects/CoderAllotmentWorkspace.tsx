@@ -64,7 +64,11 @@ function Allotment() {
           </Alert>
         )}
         <Paper variant="outlined">
-          {allotment && allotment.total === 0 ? (
+          {!allotment ? (
+            <Typography color="text.secondary" sx={{ p: 3 }}>
+              {data.error ? 'Your charts could not be loaded.' : 'Loading your charts…'}
+            </Typography>
+          ) : allotment.total === 0 ? (
             <EmptyState
               title="No charts allotted to you"
               description="When the Manager uploads an allocation file that includes your email, your charts appear here."
@@ -84,7 +88,7 @@ function Allotment() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {(allotment?.charts ?? []).map((c) => (
+                  {allotment.charts.map((c) => (
                     <TableRow key={c.id} hover>
                       <TableCell sx={{ fontWeight: 600 }}>{c.chartId}</TableCell>
                       <TableCell>

@@ -91,7 +91,13 @@ export function LiveTrackingPanel({ projectId }: { projectId: string }) {
           {data.days.map((d) => (
             <Box
               key={d.date}
-              sx={{ flex: 1, display: 'grid', justifyItems: 'center', alignContent: 'end', height: '100%' }}
+              sx={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+              }}
             >
               <Typography variant="caption" sx={num}>
                 {d.chartsDone}
@@ -100,8 +106,7 @@ export function LiveTrackingPanel({ projectId }: { projectId: string }) {
                 sx={{
                   width: '100%',
                   maxWidth: 40,
-                  height: `${(d.chartsDone / peak) * 100}%`,
-                  minHeight: d.chartsDone ? 4 : 2,
+                  height: d.chartsDone ? Math.max(4, Math.round((d.chartsDone / peak) * 120)) : 2,
                   borderRadius: '3px 3px 0 0',
                   bgcolor: d.date === data.today ? 'primary.main' : 'action.disabled',
                 }}

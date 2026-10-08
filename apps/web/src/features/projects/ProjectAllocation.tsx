@@ -225,8 +225,8 @@ export function ProjectAllocation({
                           slotProps={{ input: { 'aria-label': `Select ${c.chartId}` } }}
                         />
                       </TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>{c.chartId}</TableCell>
-                      <TableCell>
+                      <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{c.chartId}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
                         <Chip size="small" variant="outlined" label={chartStatusLabel(c.status)} />
                       </TableCell>
                       <TableCell>{c.allocation?.loginName ?? '—'}</TableCell>
@@ -234,7 +234,9 @@ export function ProjectAllocation({
                       <TableCell align="right">{c.pages ?? '—'}</TableCell>
                       <TableCell>{c.pageBucket ?? '—'}</TableCell>
                       <TableCell sx={{ maxWidth: 220 }}>{c.remarks ?? '—'}</TableCell>
-                      <TableCell>{c.allocation ? formatDateTime(c.allocation.allocatedAt) : '—'}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        {c.allocation ? formatDateTime(c.allocation.allocatedAt) : '—'}
+                      </TableCell>
                       <TableCell>
                         {c.submittedToClientAt ? (
                           <Chip size="small" color="success" variant="outlined" label="Submitted" />
