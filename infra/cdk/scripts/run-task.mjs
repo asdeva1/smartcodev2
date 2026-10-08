@@ -26,8 +26,10 @@ for (const required of ['profile', 'region', 'cluster', 'task-def', 'subnets', '
   }
 }
 const base = ['--profile', opt('profile'), '--region', opt('region')];
+// The AWS CLI is Python: on Windows its default console codec (cp1252) cannot print Prisma's unicode log characters.
+const cliEnv = { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' };
 const aws = (...a) =>
-  execFileSync('aws', [...a, ...base], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  execFileSync('aws', [...a, ...base], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: cliEnv });
 const json = (...a) => JSON.parse(aws(...a, '--output', 'json'));
 
 const taskDef = json('ecs', 'describe-task-definition', '--task-definition', opt('task-def')).taskDefinition;
