@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { navigationFor } from '@/features/navigation/navigation';
 import { CoderAllotmentWorkspace } from '@/features/projects/CoderAllotmentWorkspace';
+import { CoderChartWorkspace } from '@/features/projects/CoderChartWorkspace';
 import { ProjectDetailWorkspace } from '@/features/projects/ProjectDetailWorkspace';
 import { ProjectsWorkspace } from '@/features/projects/ProjectsWorkspace';
 import { renderWithTheme } from './render';
@@ -36,6 +37,7 @@ const MANAGER = profile('MANAGER', {
 });
 const CODER = profile('CODER', {
   'dashboard.coder': 'SELF',
+  'production.submit': 'SELF',
   'project.read': 'PROJECT',
   'chart.read': 'SELF',
 });
@@ -315,5 +317,61 @@ describe('Coder portal: My charts', () => {
     renderWithTheme(<CoderAllotmentWorkspace />);
     expect(await screen.findByText('No charts allotted to you')).toBeInTheDocument();
     expect(screen.getByText(/has not given you a Login Name yet/)).toBeInTheDocument();
+  });
+});
+
+describe('Coder portal: chart workspace', () => {
+  const workspace = {
+    id: 'ch1',
+    chartId: 'CH-1001',
+    status: 'IN_PRODUCTION',
+    pages: 12,
+    pageBucket: '1-25',
+    remarks: null,
+    loginName: 'naveen@vlms.com',
+    project: { id: 'p1', name: 'Cardiology Q4', client: 'Acme Health' },
+  };
+
+  it('shows Chart ID and pages read-only, then submits ICDs and DOS', async () => {
+    const calls = mockApi({
+      'GET /auth/me': () => json(CODER),
+      'POST /production/charts/p1/open': () => json(workspace),
+      'POST /production/charts/p1/submit': () =>
+        json({ chartId: 'CH-1001', status: 'PENDING_AUDIT', icds: 5, dos: 2, pages: 12 }),
+    });
+    const user = userEvent.setup();
+    renderWithTheme(<CoderChartWorkspace />);
+    const chartId = await screen.findByLabelText('Chart ID');
+    expect(chartId).toHaveValue('CH-1001');
+    expect(chartId).toHaveAttribute('readonly');
+    const pages = screen.getByLabelText('Page numbers');
+    expect(pages).toHaveValue('12');
+    expect(pages).toHaveAttribute('readonly');
+
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+    expect(screen.getAllByText('Enter a whole number from 0 to 9999.')).toHaveLength(2);
+    expect(calls.some((c) => c.url.endsWith('/submit'))).toBe(false);
+
+    await user.type(screen.getByLabelText('ICDs'), '5');
+    await user.type(screen.getByLabelText('DOS'), '2');
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+    expect(await screen.findByText(/sent for audit/)).toBeInTheDocument();
+    const submit = calls.find((c) => c.url.endsWith('/submit'));
+    expect(JSON.parse(String(submit?.init.body))).toEqual({ icds: 5, dos: 2 });
+    await user.click(screen.getByRole('button', { name: 'Back to my charts' }));
+    expect(push).toHaveBeenCalledWith('/coder');
+  });
+
+  it('explains when the chart is not available to this coder', async () => {
+    mockApi({
+      'GET /auth/me': () => json(CODER),
+      'POST /production/charts/p1/open': () =>
+        json(
+          { type: 'x', title: 'Not found', status: 404, code: 'NOT_FOUND', detail: 'Chart not found' },
+          404,
+        ),
+    });
+    renderWithTheme(<CoderChartWorkspace />);
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 });

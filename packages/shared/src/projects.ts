@@ -298,3 +298,34 @@ export interface MyAllotment {
   total: number;
   charts: AllotmentChart[];
 }
+
+// ───────── Coder chart workspace & production submit (Phase 8, first slice) ─────────
+
+const countSchema = z.coerce
+  .number({ error: 'Enter a number' })
+  .int('Enter a whole number')
+  .min(0, 'Cannot be negative')
+  .max(9999, 'Must be at most 9999');
+
+/** Pages come from the allocation file and cannot be edited by the coder; only ICDs and DOS are entered. */
+export const productionSubmitSchema = z.object({ icds: countSchema, dos: countSchema });
+export type ProductionSubmit = z.infer<typeof productionSubmitSchema>;
+
+export interface ChartWorkspace {
+  id: string;
+  chartId: string;
+  status: string;
+  pages: number | null;
+  pageBucket: string | null;
+  remarks: string | null;
+  loginName: string;
+  project: { id: string; name: string; client: string };
+}
+
+export interface ProductionSubmitted {
+  chartId: string;
+  status: string;
+  icds: number;
+  dos: number;
+  pages: number;
+}

@@ -3,6 +3,7 @@
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
+import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -12,6 +13,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import type { MyAllotment } from '@smartcode/shared';
+import NextLink from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { EmptyState } from '@/components/EmptyState';
 import { env } from '@/env';
@@ -90,7 +92,16 @@ function Allotment() {
                 <TableBody>
                   {allotment.charts.map((c) => (
                     <TableRow key={c.id} hover>
-                      <TableCell sx={{ fontWeight: 600 }}>{c.chartId}</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>
+                        <Link
+                          component={NextLink}
+                          href={`/coder/charts/${c.id}`}
+                          aria-label={`Open chart ${c.chartId}`}
+                          underline="hover"
+                        >
+                          {c.chartId}
+                        </Link>
+                      </TableCell>
                       <TableCell>
                         {c.project.client} · {c.project.name}
                       </TableCell>
@@ -113,7 +124,7 @@ function Allotment() {
   );
 }
 
-/** Coder portal home: the charts allotted to the signed-in coder. Starting and submitting production is Phase 8. */
+/** Coder portal home: the charts allotted to the signed-in coder. Clicking a chart opens its workspace. */
 export function CoderAllotmentWorkspace() {
   return (
     <RequireSession permission="dashboard.coder">

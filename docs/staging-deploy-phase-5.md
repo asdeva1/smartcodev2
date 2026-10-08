@@ -25,10 +25,11 @@ Shared 86, API 481 (unit + integration + database against PostgreSQL 16), web 74
 1. Manager signs in → Projects → Create project (Manual) with a lead.
 2. Chart allocation tab → Upload allocation CSV (`Login Name, Email ID, Chart ID, Pages, Page Bucket, Remarks`) with one active coder's email → preview → confirm.
 3. That coder signs in → lands on My charts → sees the charts with pages / bucket / remarks.
-4. Manager → Pull back charts → coder's list becomes empty.
-5. Create an Automatic project → no Chart allocation tab.
-6. Team Lead signs in → lands on Projects, sees only their projects; non-Manager gets 403 on creating a project.
-7. Production report: Today (Shift End), Monthly, Date range all load.
+4. Coder clicks a chart → workspace shows Chart ID and Page numbers (read-only) → enter ICDs and DOS → Submit → chart leaves My charts and the Manager's project counts/live tracking drop by one; the chart is now Pending audit.
+5. Manager → Pull back charts → coder's list becomes empty.
+6. Create an Automatic project → no Chart allocation tab.
+7. Team Lead signs in → lands on Projects, sees only their projects; non-Manager gets 403 on creating a project.
+8. Production report: Today (Shift End), Monthly, Date range all load.
 
 ## Rollback
 Web: Vercel instant rollback. API: redeploy the previous image tag (the migration is additive, so the old API runs fine on the new schema).
