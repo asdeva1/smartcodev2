@@ -180,8 +180,8 @@ describe('Project detail', () => {
     expect(screen.getByText('naveen@vlms.com')).toBeInTheDocument();
 
     await user.click(within(tabs).getByRole('tab', { name: 'Chart allocation' }));
-    expect(await screen.findByRole('button', { name: /Client pulled back charts/ })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /Submit to client \(2\)/ })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: /Pull back charts/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Completed charts \(2\)/ })).toBeEnabled();
     await user.click((await screen.findAllByRole('button', { name: 'Upload allocation CSV' }))[0]!);
     const dialog = await screen.findByRole('dialog');
     for (const col of ['Login Name', 'Email ID', 'Chart ID', 'Pages', 'Page Bucket', 'Remarks']) {

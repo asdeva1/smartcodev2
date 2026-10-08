@@ -5,8 +5,11 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
+import Radio from '@mui/material/Radio';
+import RadioGroup from '@mui/material/RadioGroup';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -44,7 +47,7 @@ const STATUS_FILTERS = [
   'COMPLETED',
 ];
 
-type Dialog = 'upload' | 'pullback' | 'client' | 'submit' | null;
+type Dialog = 'upload' | 'pullback' | 'submit' | null;
 
 export function ProjectAllocation({
   project,
@@ -96,20 +99,16 @@ export function ProjectAllocation({
         <Button variant="contained" disabled={!active} onClick={() => setDialog('upload')}>
           Upload allocation CSV
         </Button>
-        <Button variant="outlined" disabled={selected.size === 0} onClick={() => setDialog('pullback')}>
-          Pull back selected{selected.size ? ` (${selected.size})` : ''}
+        <Button
+          variant="outlined"
+          color="error"
+          disabled={selected.size === 0 && openCharts === 0}
+          onClick={() => setDialog('pullback')}
+        >
+          Pull back charts{selected.size ? ` (${selected.size} selected)` : ''}
         </Button>
         <Button variant="outlined" disabled={completedWaiting <= 0} onClick={() => setDialog('submit')}>
-          Submit to client{completedWaiting > 0 ? ` (${completedWaiting})` : ''}
-        </Button>
-        <Box sx={{ flex: 1 }} />
-        <Button
-          color="error"
-          variant="outlined"
-          disabled={openCharts === 0}
-          onClick={() => setDialog('client')}
-        >
-          Client pulled back charts
+          Completed charts{completedWaiting > 0 ? ` (${completedWaiting})` : ''}
         </Button>
       </Paper>
       {!active && (
@@ -119,8 +118,8 @@ export function ProjectAllocation({
       )}
       {project.clientPullbackAt && (
         <Alert severity="warning">
-          The client pulled this project’s charts back on {formatDateTime(project.clientPullbackAt)}. Every
-          coder’s allotment for the charts still in progress was cleared.
+          All charts were pulled back on {formatDateTime(project.clientPullbackAt)}. Every coder’s allotment
+          for the charts still in progress was cleared.
         </Alert>
       )}
 
@@ -210,7 +209,7 @@ export function ProjectAllocation({
                     <TableCell>Page bucket</TableCell>
                     <TableCell>Remarks</TableCell>
                     <TableCell>Allotted</TableCell>
-                    <TableCell>Client</TableCell>
+                    <TableCell>Completed</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -239,7 +238,7 @@ export function ProjectAllocation({
                       </TableCell>
                       <TableCell>
                         {c.submittedToClientAt ? (
-                          <Chip size="small" color="success" variant="outlined" label="Submitted" />
+                          <Chip size="small" color="success" variant="outlined" label="Completed" />
                         ) : (
                           '—'
                         )}
@@ -285,22 +284,8 @@ export function ProjectAllocation({
       )}
       {dialog === 'pullback' && (
         <PullbackDialog
-          title={`Pull back ${selected.size} chart${selected.size === 1 ? '' : 's'}`}
-          description="The charts return to the project’s repository and disappear from the coders’ allotment. They can be allotted again with a new allocation file."
           projectId={project.id}
-          chartIds={[...selected]}
-          onClose={(message) => {
-            setDialog(null);
-            if (message) {
-              onToast(message);
-              refreshAll();
-            }
-          }}
-        />
-      )}
-      {dialog === 'client' && (
-        <ClientPullbackDialog
-          projectId={project.id}
+          selectedIds={[...selected]}
           openCharts={openCharts}
           onClose={(message) => {
             setDialog(null);
@@ -329,96 +314,75 @@ export function ProjectAllocation({
 }
 
 function PullbackDialog({
-  title,
-  description,
   projectId,
-  chartIds,
+  selectedIds,
+  openCharts,
   onClose,
 }: {
-  title: string;
-  description: string;
   projectId: string;
-  chartIds: string[];
+  selectedIds: string[];
+  openCharts: number;
   onClose: (message: string | null) => void;
 }) {
+  const [scope, setScope] = useState<'selected' | 'all'>(selectedIds.length ? 'selected' : 'all');
   const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const action = useAction<string>((message) => onClose(message));
+  const plural = (n: number) => `${n} chart${n === 1 ? '' : 's'}`;
   return (
     <FormDialog
-      title={title}
+      title="Pull back charts"
       onClose={() => onClose(null)}
       submitLabel="Pull back"
       submitColor="error"
       busy={action.busy}
       error={action.error}
-      onSubmit={() =>
-        void action.run(async () => {
-          const r = await apiFetch<PullbackResult>(`/projects/${projectId}/charts/pull-back`, {
-            method: 'POST',
-            body: JSON.stringify({ chartIds, ...(reason.trim() ? { reason: reason.trim() } : {}) }),
-          });
-          return `${r.pulledBack} chart${r.pulledBack === 1 ? '' : 's'} pulled back.`;
-        })
-      }
-    >
-      <Typography>{description}</Typography>
-      <TextField
-        size="small"
-        label="Reason (optional)"
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-      />
-    </FormDialog>
-  );
-}
-
-function ClientPullbackDialog({
-  projectId,
-  openCharts,
-  onClose,
-}: {
-  projectId: string;
-  openCharts: number;
-  onClose: (message: string | null) => void;
-}) {
-  const [reason, setReason] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const action = useAction<string>((message) => onClose(message));
-  return (
-    <FormDialog
-      title="Client pulled back charts"
-      onClose={() => onClose(null)}
-      submitLabel="Clear all allotments"
-      submitColor="error"
-      busy={action.busy}
-      error={action.error}
       onSubmit={() => {
-        if (reason.trim().length < 3)
+        if (scope === 'all' && reason.trim().length < 3)
           return setError('Give a short reason, for example the client’s ticket number.');
         setError(null);
         void action.run(async () => {
-          const r = await apiFetch<PullbackResult>(`/projects/${projectId}/client-pullback`, {
-            method: 'POST',
-            body: JSON.stringify({ reason: reason.trim() }),
-          });
-          return `Client pull-back recorded. ${r.pulledBack} chart${r.pulledBack === 1 ? '' : 's'} cleared from the coders.`;
+          const body = reason.trim();
+          const r =
+            scope === 'selected'
+              ? await apiFetch<PullbackResult>(`/projects/${projectId}/charts/pull-back`, {
+                  method: 'POST',
+                  body: JSON.stringify({ chartIds: selectedIds, ...(body ? { reason: body } : {}) }),
+                })
+              : await apiFetch<PullbackResult>(`/projects/${projectId}/client-pullback`, {
+                  method: 'POST',
+                  body: JSON.stringify({ reason: body }),
+                });
+          return `${plural(r.pulledBack)} pulled back.`;
         });
       }}
     >
       <Typography>
-        This takes back all {openCharts} chart{openCharts === 1 ? '' : 's'} that coders are still holding in
-        this project, so every coder’s allotment for it becomes zero. Work already submitted for audit is not
-        changed.
+        Pulled-back charts return to the project and disappear from the coders’ allotment. Work already
+        submitted for audit is not changed.
       </Typography>
+      <RadioGroup value={scope} onChange={(e) => setScope(e.target.value as 'selected' | 'all')}>
+        <FormControlLabel
+          value="selected"
+          disabled={selectedIds.length === 0}
+          control={<Radio />}
+          label={`Selected charts (${selectedIds.length})`}
+        />
+        <FormControlLabel
+          value="all"
+          disabled={openCharts === 0}
+          control={<Radio />}
+          label={`All ${plural(openCharts)} the coders still hold — every coder’s allotment becomes zero`}
+        />
+      </RadioGroup>
       <TextField
         size="small"
-        label="Reason"
-        required
+        label={scope === 'all' ? 'Reason' : 'Reason (optional)'}
+        required={scope === 'all'}
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         error={Boolean(error)}
         helperText={error}
-        autoFocus
       />
     </FormDialog>
   );
@@ -436,9 +400,9 @@ function SubmitDialog({
   const action = useAction<string>((message) => onClose(message));
   return (
     <FormDialog
-      title="Submit to client"
+      title="Completed charts"
       onClose={() => onClose(null)}
-      submitLabel={`Submit ${waiting} chart${waiting === 1 ? '' : 's'}`}
+      submitLabel={`Mark ${waiting} completed`}
       busy={action.busy}
       error={action.error}
       onSubmit={() =>
@@ -447,7 +411,7 @@ function SubmitDialog({
             method: 'POST',
             body: JSON.stringify({}),
           });
-          return `${r.submitted} chart${r.submitted === 1 ? '' : 's'} submitted to the client.`;
+          return `${r.submitted} chart${r.submitted === 1 ? '' : 's'} marked completed.`;
         })
       }
     >
