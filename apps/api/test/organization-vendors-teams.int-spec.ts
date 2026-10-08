@@ -192,7 +192,9 @@ describeDb('Phase 4 — Organization, Vendors, Teams and vendor isolation (HTTP 
       const lone = await as(app, manager)
         .post('/vendors', { ...newVendor(30), sendActivation: false })
         .expect(201);
-      await db.sql(`UPDATE employees SET status = 'INACTIVE', deactivated_at = now() WHERE vendor_id = $1`, [lone.body.id]);
+      await db.sql(`UPDATE employees SET status = 'INACTIVE', deactivated_at = now() WHERE vendor_id = $1`, [
+        lone.body.id,
+      ]);
       const off = await as(app, manager).post(`/vendors/${lone.body.id}/deactivate`).expect(200);
       expect(off.body.status).toBe('INACTIVE');
       const on = await as(app, manager).post(`/vendors/${lone.body.id}/reactivate`).expect(200);
@@ -343,5 +345,152 @@ describeDb('Phase 4 — Organization, Vendors, Teams and vendor isolation (HTTP 
       await as(app, manager).get('/teams/not-a-uuid').expect(404);
       await as(app, manager).get('/vendors/not-a-uuid').expect(404);
     });
+  });
+});
+
+describeDb('Chart Allocation (Manager): assign Login Name by email, CSV template and Chart ID search', () => {
+  let db: TestDb;
+  let app: INestApplication;
+  let manager: Session;
+  const sessions = {} as Partial<Record<Role, Session>>;
+  let coder: { id: string; session: Session };
+
+  beforeAll(async () => {
+    db = await createTestDb();
+    await new Fixtures(db).org();
+    app = await createDbApp(db);
+    ({ session: manager } = await bootstrapAndSignInManager(app));
+    coder = await createActiveEmployee(app, manager, {
+      employeeCode: 'CA-CODER',
+      fullName: 'Naveen P',
+      email: 'naveen@smartcluestech.com',
+      role: 'CODER',
+    });
+    for (const [role, code] of [
+      ['HR', 'ca-hr'],
+      ['GROUP_COACH', 'ca-gc'],
+    ] as const) {
+      sessions[role] = (
+        await createActiveEmployee(app, manager, {
+          employeeCode: code,
+          fullName: `CA ${role}`,
+          email: `${code}@example.test`,
+          role,
+        })
+      ).session;
+    }
+  });
+
+  afterAll(async () => {
+    await app?.close();
+    await db?.close();
+  });
+
+  it('assigns a Login Name that looks like an email, typing only the employee email', async () => {
+    await as(app, manager)
+      .post('/login-names/assignments', {
+        loginName: 'naveen@vlms.com',
+        email: 'Naveen@SmartClues Tech.com'.replace(' ', ''),
+      })
+      .expect(200);
+    const list = await as(app, manager).get('/login-names?q=naveen').expect(200);
+    expect(list.body.items[0]).toMatchObject({
+      value: 'naveen@vlms.com',
+      holder: { email: 'naveen@smartcluestech.com', fullName: 'Naveen P' },
+    });
+  });
+
+  it('refuses an unknown email, a missing email and a request with both id and email', async () => {
+    await as(app, manager)
+      .post('/login-names/assignments', { loginName: 'x@vlms.com', email: 'nobody@example.test' })
+      .expect(404);
+    await as(app, manager).post('/login-names/assignments', { loginName: 'x@vlms.com' }).expect(422);
+    await as(app, manager)
+      .post('/login-names/assignments', {
+        loginName: 'x@vlms.com',
+        email: 'a@example.test',
+        employeeId: coder.id,
+      })
+      .expect(422);
+  });
+
+  it('imports the Login Name, Email template and rejects the old column layout', async () => {
+    await createActiveEmployee(app, manager, {
+      employeeCode: 'CA-CODER2',
+      fullName: 'Ravi K',
+      email: 'ravi@smartcluestech.com',
+      role: 'CODER',
+    });
+    const csv = 'Login Name,Email\nravi@vlms.com,ravi@smartcluestech.com\n';
+    const preview = await as(app, manager).post('/login-names/import/preview', { csv }).expect(200);
+    expect(preview.body).toMatchObject({ valid: 1, invalid: 0 });
+    expect(preview.body.rows[0].values).toEqual({
+      'Login Name': 'ravi@vlms.com',
+      Email: 'ravi@smartcluestech.com',
+    });
+    const commit = await as(app, manager)
+      .post('/login-names/import/commit', { csv, mode: 'valid-only' })
+      .expect(200);
+    expect(commit.body).toMatchObject({ committed: true, created: 1 });
+    const old = await as(app, manager)
+      .post('/login-names/import/preview', {
+        csv: 'Employee Email,Login Name\nravi@smartcluestech.com,r@vlms.com\n',
+      })
+      .expect(200);
+    expect(old.body.fileErrors.length).toBeGreaterThan(0);
+  });
+
+  it('only the Manager can assign or import', async () => {
+    for (const role of ['HR', 'GROUP_COACH'] as const) {
+      const s = sessions[role]!;
+      await as(app, s)
+        .post('/login-names/assignments', { loginName: 'h@vlms.com', email: 'x@example.test' })
+        .expect(403);
+      await as(app, s)
+        .post('/login-names/import/commit', { csv: 'Login Name,Email\n', mode: 'valid-only' })
+        .expect(403);
+    }
+  });
+
+  it('Chart ID search shows Login Name, assigned employee, who allocated and when — and is Manager-only', async () => {
+    const fx = new Fixtures(db);
+    fx.organizationId = (await db.sql<{ id: string }>(`SELECT id FROM organizations LIMIT 1`))[0]!.id;
+    const project = await fx.project();
+    const mgr = (await db.sql<{ id: string }>(`SELECT id FROM employees WHERE role = 'MANAGER'`))[0]!.id;
+    const ln = await db.sql<{ id: string }>(`SELECT id FROM login_names WHERE value = 'naveen@vlms.com'`);
+    const chart = await fx.chart(project.id, 'CH-LOOKUP-1');
+    await fx.chart(project.id, 'CH-LOOKUP-2');
+    await fx.assignProject(project.id, coder.id, 'CODER', mgr);
+    await db.prisma.chartAllocation.create({
+      data: {
+        chartId: chart.id,
+        loginNameId: ln[0]!.id,
+        employeeId: coder.id,
+        allocatedById: mgr,
+        source: 'MANUAL',
+      },
+    });
+
+    const hit = await as(app, manager).get('/allocation/charts?q=ch-lookup-1').expect(200);
+    expect(hit.body).toHaveLength(1);
+    expect(hit.body[0]).toMatchObject({
+      chartId: 'CH-LOOKUP-1',
+      allocation: {
+        loginName: 'naveen@vlms.com',
+        assignedTo: { fullName: 'Naveen P', email: 'naveen@smartcluestech.com' },
+        allocatedBy: { fullName: 'Test Manager' },
+      },
+    });
+    expect(hit.body[0].allocation.allocatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    const both = await as(app, manager).get('/allocation/charts?q=CH-LOOKUP').expect(200);
+    expect(both.body).toHaveLength(2);
+    expect(both.body.find((c: { chartId: string }) => c.chartId === 'CH-LOOKUP-2').allocation).toBeNull();
+
+    await as(app, manager).get('/allocation/charts?q=NOPE-0').expect(200);
+    await as(app, manager).get('/allocation/charts').expect(422);
+    for (const role of ['HR', 'GROUP_COACH'] as const)
+      await as(app, sessions[role]!).get('/allocation/charts?q=CH').expect(403);
+    await anonymous(app).get('/allocation/charts?q=CH').expect(401);
   });
 });

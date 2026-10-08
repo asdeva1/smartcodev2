@@ -45,7 +45,6 @@ import {
   AddEmployeeDialog,
   DeactivateDialog,
   EmployeeDetailDialog,
-  LoginNameDialog,
   RoleChangeDialog,
 } from './EmployeeDialogs';
 
@@ -56,7 +55,6 @@ type Dialog =
   | { kind: 'view'; employee: EmployeeRecord }
   | { kind: 'role'; employee: EmployeeRecord }
   | { kind: 'deactivate'; employee: EmployeeRecord }
-  | { kind: 'loginName'; employee: EmployeeRecord }
   | null;
 
 const EMPTY_OPTIONS: DirectoryOptions = { vendors: [], teams: [], projects: [] };
@@ -74,7 +72,6 @@ export function EmployeeDirectory() {
   const canDeactivate = can('employee.deactivate');
   const canReset = can('employee.triggerPasswordReset');
   const canChangeRole = can('employee.changeRole');
-  const canAssign = can('loginName.assign');
   const isManager = profile.employee.role === 'MANAGER';
 
   const [filters, setFilters] = useState({
@@ -84,7 +81,6 @@ export function EmployeeDirectory() {
     vendorId: '',
     teamId: '',
     projectId: '',
-    loginName: '',
   });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
@@ -193,7 +189,7 @@ export function EmployeeDirectory() {
         <TextField
           size="small"
           label="Search"
-          placeholder="Employee ID, name, email, Login Name"
+          placeholder="Employee ID, name, email"
           value={filters.q}
           onChange={(e) => change('q')(e.target.value)}
           sx={{ minWidth: 280, flex: 1 }}
@@ -299,13 +295,6 @@ export function EmployeeDirectory() {
             ))}
           </TextField>
         )}
-        <TextField
-          size="small"
-          label="Login Name"
-          value={filters.loginName}
-          onChange={(e) => change('loginName')(e.target.value)}
-          sx={{ minWidth: 150 }}
-        />
       </Box>
 
       {error && (
@@ -351,7 +340,6 @@ export function EmployeeDirectory() {
                   <TableCell>Team Lead</TableCell>
                   <TableCell>Project</TableCell>
                   <TableCell>Vendor</TableCell>
-                  <TableCell>Login Name</TableCell>
                   <TableCell>{head('status', 'Status')}</TableCell>
                   <TableCell>{head('createdAt', 'Created')}</TableCell>
                   <TableCell>{head('activatedAt', 'Activated')}</TableCell>
@@ -380,7 +368,6 @@ export function EmployeeDirectory() {
                       {e.projects.length ? e.projects.map((p) => p.name).join(', ') : '—'}
                     </TableCell>
                     <TableCell>{e.vendor?.name ?? 'In-house'}</TableCell>
-                    <TableCell>{e.loginName ?? '—'}</TableCell>
                     <TableCell>
                       <EmployeeStatusChip status={e.status} />
                     </TableCell>
@@ -418,11 +405,11 @@ export function EmployeeDirectory() {
         {menu && (
           <RowMenu
             employee={menu.employee}
-            flags={{ canUpdate, canSend, canDeactivate, canReset, canChangeRole, canAssign, isManager }}
+            flags={{ canUpdate, canSend, canDeactivate, canReset, canChangeRole, isManager }}
             onPick={(next) => {
               const employee = menu.employee;
               setMenu(null);
-              if (next === 'view' || next === 'role' || next === 'deactivate' || next === 'loginName')
+              if (next === 'view' || next === 'role' || next === 'deactivate')
                 setDialog({ kind: next, employee });
               if (next === 'activation')
                 void act(
@@ -453,21 +440,15 @@ export function EmployeeDirectory() {
         />
       )}
       {dialog?.kind === 'view' && (
-        <EmployeeDetailDialog
-          employee={dialog.employee}
-          canEdit={canUpdate}
-          canSeeLoginNames={can('loginName.read')}
-          onClose={closeDialog}
-        />
+        <EmployeeDetailDialog employee={dialog.employee} canEdit={canUpdate} onClose={closeDialog} />
       )}
       {dialog?.kind === 'role' && <RoleChangeDialog employee={dialog.employee} onClose={closeDialog} />}
       {dialog?.kind === 'deactivate' && <DeactivateDialog employee={dialog.employee} onClose={closeDialog} />}
-      {dialog?.kind === 'loginName' && <LoginNameDialog employee={dialog.employee} onClose={closeDialog} />}
       {dialog?.kind === 'import' && (
         <CsvImportDialog
           title="Import employees"
           columns={EMPLOYEE_CSV_COLUMNS}
-          guidance="Every row becomes a pending employee. Do not include passwords, Login Names or teams — people set their own password from the activation link, and Login Names are assigned afterwards."
+          guidance="Every row becomes a pending employee. Do not include passwords or teams — people set their own password from the activation link. Login Names are assigned in Chart Allocation."
           previewPath="/employees/import/preview"
           commitPath="/employees/import/commit"
           doneVerb="created"
@@ -500,7 +481,7 @@ export function EmployeeDirectory() {
   );
 }
 
-type RowAction = 'view' | 'activation' | 'reset' | 'role' | 'deactivate' | 'reactivate' | 'loginName';
+type RowAction = 'view' | 'activation' | 'reset' | 'role' | 'deactivate' | 'reactivate';
 
 function RowMenu({
   employee,
@@ -509,7 +490,7 @@ function RowMenu({
 }: {
   employee: EmployeeRecord;
   flags: Record<
-    'canUpdate' | 'canSend' | 'canDeactivate' | 'canReset' | 'canChangeRole' | 'canAssign' | 'isManager',
+    'canUpdate' | 'canSend' | 'canDeactivate' | 'canReset' | 'canChangeRole' | 'isManager',
     boolean
   >;
   onPick: (action: RowAction) => void;
@@ -523,8 +504,6 @@ function RowMenu({
   if (flags.canSend && employee.status === 'PENDING_ACTIVATION')
     items.push(item('activation', 'Send activation link'));
   if (flags.canReset && employee.status === 'ACTIVE') items.push(item('reset', 'Send password reset link'));
-  if (flags.canAssign && employee.status === 'ACTIVE' && employee.loginNameEligible)
-    items.push(item('loginName', employee.loginName ? 'Change Login Name' : 'Assign Login Name'));
   if (flags.canChangeRole) items.push(item('role', 'Change role'));
   if (flags.canDeactivate && employee.status !== 'INACTIVE') items.push(item('deactivate', 'Deactivate'));
   if (flags.canDeactivate && employee.status === 'INACTIVE') items.push(item('reactivate', 'Reactivate'));

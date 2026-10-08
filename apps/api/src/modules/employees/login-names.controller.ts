@@ -47,12 +47,13 @@ export class LoginNamesController {
   @Post('login-names/assignments')
   @RequirePermission('loginName.assign')
   @HttpCode(200)
-  assign(
+  async assign(
     @CurrentPrincipal() p: Principal,
     @Body(new ZodValidationPipe(loginNameAssignSchema)) body: LoginNameAssign,
     @Meta() meta: RequestMeta,
   ) {
-    return this.loginNames.assign(p, body.employeeId, body.loginName, meta);
+    const employeeId = body.employeeId ?? (await this.loginNames.employeeIdForEmail(p, body.email ?? ''));
+    return this.loginNames.assign(p, employeeId, body.loginName, meta);
   }
 
   @Post('login-names/release')

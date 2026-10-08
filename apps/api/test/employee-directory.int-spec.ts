@@ -128,14 +128,14 @@ const PROBES: Probe[] = [
     permission: 'loginName.assign',
     method: 'post',
     url: '/login-names/import/preview',
-    body: { csv: 'Employee Email,Login Name\n' },
+    body: { csv: 'Login Name,Email\n' },
   },
   {
     name: 'commit Login Name CSV',
     permission: 'loginName.assign',
     method: 'post',
     url: '/login-names/import/commit',
-    body: { csv: 'Employee Email,Login Name\n', mode: 'valid-only' },
+    body: { csv: 'Login Name,Email\n', mode: 'valid-only' },
   },
 ];
 
@@ -717,8 +717,8 @@ describeDb('Employee Directory, Login Names and RBAC (HTTP + PostgreSQL)', () =>
     });
   });
 
-  describe('Login Name CSV (Employee Email, Login Name)', () => {
-    const header = 'Employee Email,Login Name';
+  describe('Login Name CSV (Login Name, Email)', () => {
+    const header = 'Login Name,Email';
     let ok1: string;
     let ok2: string;
     let pendingEmail: string;
@@ -757,16 +757,16 @@ describeDb('Employee Directory, Login Names and RBAC (HTTP + PostgreSQL)', () =>
     it('detects every invalid case before anything is assigned', async () => {
       const csv = [
         header,
-        `${ok1},SCLN-NEW1`, // 2 valid
-        `${ok2},SCLN-NEW2`, // 3 valid
-        'unknown@example.test,SCLN-NEW3', // 4 unknown email
-        `${inactiveEmail},SCLN-NEW4`, // 5 inactive
-        `${pendingEmail},SCLN-NEW5`, // 6 pending
-        'dir101@example.test,SCLN-NEW6', // 7 ineligible role (HR)
-        `${ok1},SCLN-NEW7`, // 8 duplicate employee in CSV
-        'dir103@example.test,SCLN-NEW2', // 9 duplicate Login Name in CSV
-        'dir104@example.test,SCLN-TAKEN', // 10 already assigned to someone else
-        'ln3@example.test,SCLN-NEW8', // 11 valid
+        `SCLN-NEW1,${ok1}`, // 2 valid
+        `SCLN-NEW2,${ok2}`, // 3 valid
+        'SCLN-NEW3,unknown@example.test', // 4 unknown email
+        `SCLN-NEW4,${inactiveEmail}`, // 5 inactive
+        `SCLN-NEW5,${pendingEmail}`, // 6 pending
+        'SCLN-NEW6,dir101@example.test', // 7 ineligible role (HR)
+        `SCLN-NEW7,${ok1}`, // 8 duplicate employee in CSV
+        'SCLN-NEW2,dir103@example.test', // 9 duplicate Login Name in CSV
+        'SCLN-TAKEN,dir104@example.test', // 10 already assigned to someone else
+        'SCLN-NEW8,ln3@example.test', // 11 valid
       ].join('\n');
       const res = await as(app, manager).post('/login-names/import/preview', { csv }).expect(200);
       const row = (line: number) => res.body.rows.find((r: { line: number }) => r.line === line);
@@ -786,7 +786,7 @@ describeDb('Employee Directory, Login Names and RBAC (HTTP + PostgreSQL)', () =>
     });
 
     it('commits only the valid rows', async () => {
-      const csv = [header, `${ok1},SCLN-NEW1`, `${ok2},SCLN-NEW2`, 'unknown@example.test,SCLN-NEW3'].join(
+      const csv = [header, `SCLN-NEW1,${ok1}`, `SCLN-NEW2,${ok2}`, 'SCLN-NEW3,unknown@example.test'].join(
         '\n',
       );
       const res = await as(app, manager)

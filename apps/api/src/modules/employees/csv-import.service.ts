@@ -347,8 +347,8 @@ export class LoginNameImportService {
     const drafts: Draft[] = parsed.rows.map((row) => ({
       line: row.line,
       values: {
-        'Employee Email': row.cells['employeeemail'] ?? '',
         'Login Name': row.cells['loginname'] ?? '',
+        Email: row.cells['email'] ?? '',
       },
       errors: [],
       warnings: [],
@@ -356,12 +356,9 @@ export class LoginNameImportService {
     }));
     const parsedValues = new Map<Draft, { email: string; loginName: string }>();
     for (const d of drafts) {
-      const email = emailSchema.safeParse(d.values['Employee Email']);
+      const email = emailSchema.safeParse(d.values.Email);
       const loginName = loginNameSchema.safeParse(d.values['Login Name']);
-      if (!email.success)
-        d.errors.push(
-          d.values['Employee Email'] ? 'Enter a valid email address' : 'Employee Email is required',
-        );
+      if (!email.success) d.errors.push(d.values.Email ? 'Enter a valid email address' : 'Email is required');
       if (!loginName.success) d.errors.push(loginName.error.issues[0]?.message ?? 'Login Name is not valid');
       if (email.success && loginName.success)
         parsedValues.set(d, { email: email.data, loginName: loginName.data });

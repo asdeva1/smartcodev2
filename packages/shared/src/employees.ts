@@ -139,7 +139,13 @@ export interface Page<T> {
 
 // ───────── Login Names ─────────
 
-export const loginNameAssignSchema = z.object({ employeeId: uuid, loginName: loginNameSchema });
+/** Assign by the employee's email (what the Manager types) or, for internal callers, by id — exactly one. */
+export const loginNameAssignSchema = z
+  .object({ employeeId: uuid.optional(), email: emailSchema.optional(), loginName: loginNameSchema })
+  .refine((v) => (v.employeeId === undefined) !== (v.email === undefined), {
+    message: 'Enter the email address of the employee',
+    path: ['email'],
+  });
 export type LoginNameAssign = z.infer<typeof loginNameAssignSchema>;
 
 export const loginNameReleaseSchema = z.object({ employeeId: uuid });
@@ -192,4 +198,4 @@ export interface CsvResult {
 }
 
 export const EMPLOYEE_CSV_COLUMNS = ['Employee Name', 'Employee ID', 'Email', 'Role'] as const;
-export const LOGIN_NAME_CSV_COLUMNS = ['Employee Email', 'Login Name'] as const;
+export const LOGIN_NAME_CSV_COLUMNS = ['Login Name', 'Email'] as const;

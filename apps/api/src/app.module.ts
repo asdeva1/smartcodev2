@@ -10,6 +10,7 @@ import { MailModule } from './core/mail/mail.module';
 import { LoggingModule } from './core/logging/logging.module';
 import { PrismaModule } from './core/prisma/prisma.module';
 import { HealthController } from './modules/health/health.controller';
+import { AllocationModule } from './modules/allocation/allocation.module';
 import { AuthApiModule } from './modules/auth/auth.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { MetaController } from './modules/meta/meta.controller';
@@ -43,6 +44,7 @@ export class AppModule {
         OrganizationModule,
         VendorsModule,
         TeamsModule,
+        AllocationModule,
       ],
       controllers: [HealthController, MetaController],
       providers: [

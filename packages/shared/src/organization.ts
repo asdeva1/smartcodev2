@@ -170,3 +170,23 @@ export interface TeamRecord {
 export interface TeamDetail extends TeamRecord {
   members: TeamMemberRecord[];
 }
+
+// ───────── Chart allocation lookup (Manager) ─────────
+
+export const chartLookupQuerySchema = z.object({
+  q: z.string().trim().min(1, 'Enter a Chart ID').max(128),
+});
+export type ChartLookupQuery = z.infer<typeof chartLookupQuerySchema>;
+
+/** What the Manager sees after searching a Chart ID: who holds it, who allocated it and when. */
+export interface ChartLookupRecord {
+  chartId: string;
+  project: { id: string; name: string; client: string };
+  status: string;
+  allocation: {
+    loginName: string;
+    assignedTo: { id: string; fullName: string; email: string };
+    allocatedBy: { id: string; fullName: string };
+    allocatedAt: string;
+  } | null;
+}

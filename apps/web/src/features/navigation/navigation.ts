@@ -83,16 +83,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {
     key: 'allocation',
     label: 'Chart allocation',
-    href: '/allocation',
+    href: '/manager/allocation',
     permission: 'chart.allocate',
-    group: 'Operations',
-    available: false,
-  },
-  {
-    key: 'login-names',
-    label: 'Login names',
-    href: '/manager/employees?tab=login-names',
-    permission: 'loginName.assign',
     group: 'Operations',
     available: true,
   },

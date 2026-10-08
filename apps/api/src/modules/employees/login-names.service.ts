@@ -22,7 +22,14 @@ export interface LoginNameRow {
   id: string;
   value: string;
   status: string;
-  holder: { id: string; employeeCode: string; fullName: string; role: Role; status: string } | null;
+  holder: {
+    id: string;
+    employeeCode: string;
+    fullName: string;
+    email: string;
+    role: Role;
+    status: string;
+  } | null;
   assignedAt: string | null;
 }
 
@@ -83,7 +90,14 @@ export class LoginNamesService {
             take: 1,
             include: {
               employee: {
-                select: { id: true, employeeCode: true, fullName: true, role: true, status: true },
+                select: {
+                  id: true,
+                  employeeCode: true,
+                  fullName: true,
+                  email: true,
+                  role: true,
+                  status: true,
+                },
               },
             },
           },
@@ -129,6 +143,20 @@ export class LoginNamesService {
       endReason: r.endReason,
       assignedBy: r.assignedBy.fullName,
     }));
+  }
+
+  /** The employee a typed email address belongs to (Manager only), or a clear 404. */
+  async employeeIdForEmail(principal: Principal, email: string): Promise<string> {
+    const found = await this.prisma.client.employee.findFirst({
+      where: { organizationId: principal.organizationId, email: email.trim().toLowerCase() },
+      select: { id: true },
+    });
+    if (!found) {
+      throw new ProblemException(404, 'NOT_FOUND', 'No employee has this email address', [
+        { field: 'email', message: 'No employee has this email address' },
+      ]);
+    }
+    return found.id;
   }
 
   // ───────── assign / change ─────────
