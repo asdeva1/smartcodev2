@@ -16,6 +16,6 @@ buildApp(app, {
   cookieDomain: ctx('cookieDomain'),
   backupRetentionDays:
     ctx('backupRetentionDays') === undefined ? undefined : Number(ctx('backupRetentionDays')),
-  cloudFrontApi: String(ctx('cloudFrontApi')) === 'true',
+  httpsApiGateway: String(ctx('httpsApiGateway')) === 'true',
   desiredCount: ctx('desiredCount') === undefined ? undefined : Number(ctx('desiredCount')),
 });

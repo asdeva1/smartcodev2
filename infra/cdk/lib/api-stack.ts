@@ -1,7 +1,7 @@
 import { Annotations, CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
-import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
-import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
+import * as apigwIntegrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
@@ -37,8 +37,8 @@ export interface ApiStackProps extends StackProps {
   cookieDomain?: string;
   /** First-deploy escape hatch: 0 creates the service before an image exists in ECR. */
   desiredCountOverride?: number;
-  /** Staging only: put CloudFront in front of the ALB to get an https API URL without a domain. */
-  cloudFrontApi?: boolean;
+  /** Staging only: put an API Gateway HTTP API in front of the ALB to get an https API URL without a domain. */
+  httpsApiGateway?: boolean;
 }
 
 /**
@@ -152,26 +152,28 @@ export class ApiStack extends Stack {
       // The L2 pattern rejects 0; the first deploy happens before any image exists in ECR.
       (this.service.service.node.defaultChild as ecs.CfnService).desiredCount = 0;
     }
-    if (props.cloudFrontApi) {
+    if (props.httpsApiGateway) {
       if (config.name === 'production') {
-        Annotations.of(this).addError('cloudFrontApi is a staging stop-gap; production uses its own domain and ACM certificate.');
+        Annotations.of(this).addError(
+          'httpsApiGateway is a staging stop-gap; production uses its own domain and ACM certificate.',
+        );
       }
-      // Staging stop-gap while no domain/ACM certificate exists: CloudFront terminates TLS with its default
-      // certificate and forwards to the ALB. Nothing is cached and every header/cookie/query string is forwarded.
-      const distribution = new cloudfront.Distribution(this, 'ApiFrontDoor', {
-        comment: `SmartCode ${config.name} API HTTPS front door (stop-gap until a domain exists)`,
-        defaultBehavior: {
-          origin: new origins.LoadBalancerV2Origin(this.service.loadBalancer, {
-            protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
-          }),
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER,
-        },
-        minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+      // Staging stop-gap while no domain/ACM certificate exists: an API Gateway HTTP API terminates TLS with the
+      // AWS-managed certificate and proxies every path, header and cookie to the ALB.
+      const httpApi = new apigwv2.HttpApi(this, 'ApiFrontDoor', {
+        apiName: `smartcode-${config.name}-api-https`,
+        description: `SmartCode ${config.name} API HTTPS front door (stop-gap until a domain exists)`,
+        createDefaultStage: true,
       });
-      const frontDoorUrl = `https://${distribution.distributionDomainName}`;
+      httpApi.addRoutes({
+        path: '/{proxy+}',
+        methods: [apigwv2.HttpMethod.ANY],
+        integration: new apigwIntegrations.HttpUrlIntegration(
+          'AlbProxy',
+          `http://${this.service.loadBalancer.loadBalancerDnsName}/{proxy}`,
+        ),
+      });
+      const frontDoorUrl = (httpApi.apiEndpoint ?? '').replace(/\/$/, '');
       // Overrides the placeholder API_URL on the service container and on the one-off tasks below.
       this.service.taskDefinition.defaultContainer?.addEnvironment('API_URL', frontDoorUrl);
       environment.API_URL = frontDoorUrl;
