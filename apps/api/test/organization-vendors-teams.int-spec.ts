@@ -70,9 +70,7 @@ describeDb('Phase 4 — Organization, Vendors, Teams and vendor isolation (HTTP 
       ['AUDITOR', 'p4-au', vendorA.id],
       ['CODER', 'p4-co', vendorA.id],
     ];
-    let n = 10;
     for (const [role, code, vendorId] of people) {
-      n += 1;
       const made = await createActiveEmployee(app, manager, {
         employeeCode: code,
         fullName: `P4 ${role}`,

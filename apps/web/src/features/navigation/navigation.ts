@@ -54,7 +54,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/coder',
     permission: 'dashboard.coder',
     group: 'Overview',
-    available: false,
+    available: true,
   },
   {
     key: 'auditor-home',
@@ -65,12 +65,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     available: false,
   },
   {
-    key: 'clients',
-    label: 'Clients & projects',
+    key: 'projects',
+    label: 'Projects',
     href: '/projects',
     permission: 'project.read',
     group: 'Operations',
-    available: false,
+    available: true,
   },
   {
     key: 'charts',

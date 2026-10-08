@@ -151,7 +151,9 @@ describe('RequireSession', () => {
   });
   it('lands each role on a page that exists', () => {
     expect(homeFor('MANAGER')).toBe('/manager');
-    expect(homeFor('CODER')).toBe('/');
+    expect(homeFor('CODER')).toBe('/coder');
+    expect(homeFor('TEAM_LEAD')).toBe('/projects');
+    expect(homeFor('VENDOR_ADMIN')).toBe('/manager/employees');
   });
 });
 

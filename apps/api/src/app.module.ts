@@ -15,6 +15,7 @@ import { AuthApiModule } from './modules/auth/auth.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { MetaController } from './modules/meta/meta.controller';
 import { OrganizationModule } from './modules/organization/organization.module';
+import { ProjectsModule } from './modules/projects/projects.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { VendorsModule } from './modules/vendors/vendors.module';
 
@@ -45,6 +46,7 @@ export class AppModule {
         VendorsModule,
         TeamsModule,
         AllocationModule,
+        ProjectsModule,
       ],
       controllers: [HealthController, MetaController],
       providers: [

@@ -46,7 +46,7 @@ export function parseRole(text: string): Role | null {
   return direct ?? ROLE_ALIASES[normaliseHeader(text)] ?? null;
 }
 
-interface Draft {
+export interface Draft {
   line: number;
   values: Record<string, string>;
   errors: string[];
@@ -54,7 +54,7 @@ interface Draft {
   duplicate: boolean;
 }
 
-function finish(drafts: Draft[], fileErrors: string[]): CsvPreview {
+export function finish(drafts: Draft[], fileErrors: string[]): CsvPreview {
   const rows: CsvPreviewRow[] = drafts.map((d) => {
     const status: CsvRowStatus = d.errors.length ? 'INVALID' : d.duplicate ? 'DUPLICATE' : 'VALID';
     return { line: d.line, status, values: d.values, errors: d.errors, warnings: d.warnings };
@@ -72,7 +72,7 @@ function finish(drafts: Draft[], fileErrors: string[]): CsvPreview {
 }
 
 /** Marks every occurrence of a repeated key (not just the second) so nothing ambiguous is committed. */
-function markRepeats(
+export function markRepeats(
   drafts: Draft[],
   keyOf: (d: Draft) => string | null,
   message: (lines: number[]) => string,
@@ -92,10 +92,11 @@ function markRepeats(
   }
 }
 
-function readCsv(
+export function readCsv(
   csv: string,
   required: readonly string[],
   forbidden: string[],
+  optional: readonly string[] = [],
 ): { parsed: ReturnType<typeof parseCsv> | null; fileErrors: string[] } {
   try {
     const parsed = parseCsv(csv);
@@ -108,13 +109,15 @@ function readCsv(
       if (present.has(normaliseHeader(bad)))
         fileErrors.push(`Remove the "${bad}" column — it is not part of this import`);
     }
-    const allowed = new Set(required.map(normaliseHeader));
+    const allowed = new Set([...required, ...optional].map(normaliseHeader));
     for (const header of parsed.headers) {
       if (
         !allowed.has(normaliseHeader(header)) &&
         !forbidden.some((f) => normaliseHeader(f) === normaliseHeader(header))
       ) {
-        fileErrors.push(`Unknown column "${header}" — allowed columns: ${required.join(', ')}`);
+        fileErrors.push(
+          `Unknown column "${header}" — allowed columns: ${[...required, ...optional].join(', ')}`,
+        );
       }
     }
     return { parsed, fileErrors };

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { ChartLookupRecord } from '@smartcode/shared';
+import type { ChartLookupRecord, MyAllotment } from '@smartcode/shared';
 import type { Principal } from '../../core/auth/principal';
 import { PrismaService } from '../../core/prisma/prisma.service';
 
@@ -51,5 +51,46 @@ export class AllocationService {
             : null,
         };
       });
+  }
+
+  /** Charts the signed-in coder currently holds (ALLOCATED or IN_PRODUCTION), newest allocation first. */
+  async myAllotment(principal: Principal): Promise<MyAllotment> {
+    if (principal.role !== 'CODER') return { loginName: null, total: 0, charts: [] };
+    const [name, rows] = await Promise.all([
+      this.prisma.client.loginNameAssignment.findFirst({
+        where: { employeeId: principal.employeeId, endedAt: null },
+        select: { loginName: { select: { value: true } } },
+      }),
+      this.prisma.client.chartAllocation.findMany({
+        where: {
+          employeeId: principal.employeeId,
+          status: 'ACTIVE',
+          chart: { status: { in: ['ALLOCATED', 'IN_PRODUCTION'] } },
+        },
+        orderBy: [{ allocatedAt: 'desc' }, { id: 'asc' }],
+        take: 500,
+        include: {
+          loginName: { select: { value: true } },
+          chart: {
+            include: { project: { select: { id: true, name: true, client: { select: { name: true } } } } },
+          },
+        },
+      }),
+    ]);
+    return {
+      loginName: name?.loginName.value ?? null,
+      total: rows.length,
+      charts: rows.map((a) => ({
+        id: a.chart.id,
+        chartId: a.chart.chartRef,
+        status: a.chart.status,
+        pages: a.chart.pages,
+        pageBucket: a.chart.pageBucket,
+        remarks: a.chart.remarks,
+        loginName: a.loginName.value,
+        allocatedAt: a.allocatedAt.toISOString(),
+        project: { id: a.chart.project.id, name: a.chart.project.name, client: a.chart.project.client.name },
+      })),
+    };
   }
 }

@@ -19,4 +19,11 @@ export class AllocationController {
   ) {
     return this.allocation.searchCharts(p, query.q);
   }
+
+  /** The Coder Portal allotment: charts currently allocated to the signed-in coder, across projects. */
+  @Get('mine')
+  @RequirePermission('chart.read')
+  mine(@CurrentPrincipal() p: Principal) {
+    return this.allocation.myAllotment(p);
+  }
 }
