@@ -415,6 +415,7 @@ function Teams() {
           <TextField
             size="small"
             label="Search team name"
+            fullWidth={false}
             value={q}
             onChange={(e) => {
               setQ(e.target.value);
@@ -427,6 +428,7 @@ function Teams() {
               size="small"
               select
               label="Vendor"
+              fullWidth={false}
               value={vendorId}
               onChange={(e) => {
                 setVendorId(e.target.value);
@@ -446,6 +448,7 @@ function Teams() {
             size="small"
             select
             label="Status"
+            fullWidth={false}
             value={status}
             onChange={(e) => {
               setStatus(e.target.value);

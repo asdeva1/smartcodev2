@@ -210,6 +210,7 @@ function Vendors() {
           <TextField
             size="small"
             label="Search name or code"
+            fullWidth={false}
             value={q}
             onChange={(e) => {
               setQ(e.target.value);
@@ -221,6 +222,7 @@ function Vendors() {
             size="small"
             select
             label="Status"
+            fullWidth={false}
             value={status}
             onChange={(e) => {
               setStatus(e.target.value);
