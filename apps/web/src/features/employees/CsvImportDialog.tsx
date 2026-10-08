@@ -32,6 +32,8 @@ export interface CsvImportConfig {
   title: string;
   /** Columns the file must have, shown to the person and used for the downloadable template. */
   columns: readonly string[];
+  /** Optional example line placed under the header in the downloadable template. */
+  templateRow?: string;
   /** Notes on what the file must not contain, and what happens next. */
   guidance: ReactNode;
   previewPath: string;
@@ -108,7 +110,7 @@ export function CsvImportDialog(config: CsvImportConfig) {
     }
   }
 
-  const template = `data:text/csv;charset=utf-8,${encodeURIComponent(`${config.columns.join(',')}\n`)}`;
+  const template = `data:text/csv;charset=utf-8,${encodeURIComponent(`${config.columns.join(',')}\n${config.templateRow ? `${config.templateRow}\n` : ''}`)}`;
   const blocked = Boolean(preview && (preview.fileErrors.length > 0 || preview.valid === 0));
   const allValid = Boolean(
     preview && preview.invalid === 0 && preview.duplicates === 0 && preview.fileErrors.length === 0,

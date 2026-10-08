@@ -10,3 +10,5 @@ export * from './audit-actions.js';
 export * from './employees.js';
 export * from './csv.js';
 export * from './password-policy.js';
+export * from './organization.js';
+export * from './projects.js';

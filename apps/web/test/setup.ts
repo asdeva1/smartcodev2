@@ -16,6 +16,7 @@ vi.mock('next/image', () => ({
 export const push = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn() }),
+  useParams: () => ({ id: 'p1' }),
   usePathname: () => '/',
   useSearchParams: () => new URLSearchParams(),
   notFound: () => {

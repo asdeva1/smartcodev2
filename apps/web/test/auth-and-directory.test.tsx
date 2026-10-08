@@ -151,7 +151,9 @@ describe('RequireSession', () => {
   });
   it('lands each role on a page that exists', () => {
     expect(homeFor('MANAGER')).toBe('/manager');
-    expect(homeFor('CODER')).toBe('/');
+    expect(homeFor('CODER')).toBe('/coder');
+    expect(homeFor('TEAM_LEAD')).toBe('/projects');
+    expect(homeFor('VENDOR_ADMIN')).toBe('/manager/employees');
   });
 });
 
@@ -247,7 +249,6 @@ describe('Employee Directory', () => {
       'Team Lead',
       'Project',
       'Vendor',
-      'Login Name',
       'Status',
       'Created',
       'Activated',
@@ -257,10 +258,12 @@ describe('Employee Directory', () => {
     expect(await within(table).findByText('Casey Coder')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add employee' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Import CSV' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Login Names' })).toBeInTheDocument();
+    // Login Names are managed in Chart Allocation, not in the directory.
+    expect(screen.queryByRole('tab', { name: 'Login Names' })).not.toBeInTheDocument();
+    expect(within(table).queryByRole('columnheader', { name: 'Login Name' })).not.toBeInTheDocument();
   });
 
-  it('offers HR a read-only directory: no add, import, selection or Login Names tab', async () => {
+  it('offers HR a read-only directory: no add, import or selection', async () => {
     directoryApi(HR);
     renderWithTheme(<EmployeesWorkspace />);
     await screen.findByText('Casey Coder');
@@ -280,11 +283,10 @@ describe('Employee Directory', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Actions for Pia Pending' }));
     expect(screen.getByRole('menuitem', { name: 'Send activation link' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /password reset/i })).not.toBeInTheDocument(); // pending must activate, not reset
-    expect(screen.queryByRole('menuitem', { name: /Login Name/ })).not.toBeInTheDocument(); // Login Names only for ACTIVE
     await userEvent.keyboard('{Escape}');
     await userEvent.click(screen.getByRole('button', { name: 'Actions for Casey Coder' }));
     expect(screen.getByRole('menuitem', { name: 'Send password reset link' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Assign Login Name' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Login Name/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Send activation link' })).not.toBeInTheDocument();
   });
 
@@ -341,14 +343,14 @@ describe('CSV import dialog', () => {
       {
         line: 2,
         status: 'VALID',
-        values: { 'Employee Email': 'a@example.test', 'Login Name': 'SCLN1' },
+        values: { 'Login Name': 'a@vlms.test', Email: 'a@example.test' },
         errors: [],
         warnings: [],
       },
       {
         line: 3,
         status: 'INVALID',
-        values: { 'Employee Email': 'b@example.test', 'Login Name': 'SCLN2' },
+        values: { 'Login Name': 'b@vlms.test', Email: 'b@example.test' },
         errors: ['This employee has not activated their account yet'],
         warnings: [],
       },
@@ -366,7 +368,7 @@ describe('CSV import dialog', () => {
     renderWithTheme(
       <CsvImportDialog
         title="Import Login Names"
-        columns={['Employee Email', 'Login Name']}
+        columns={['Login Name', 'Email']}
         guidance="x"
         previewPath="/login-names/import/preview"
         commitPath="/login-names/import/commit"
@@ -376,7 +378,7 @@ describe('CSV import dialog', () => {
     );
     await userEvent.upload(
       screen.getByLabelText('CSV file'),
-      file('Employee Email,Login Name\na@example.test,SCLN1\n'),
+      file('Login Name,Email\na@vlms.test,a@example.test\n'),
     );
     expect(await screen.findByText(/1 ready/)).toBeInTheDocument();
     expect(screen.getByText('This employee has not activated their account yet')).toBeInTheDocument();
