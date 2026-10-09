@@ -141,7 +141,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/reports',
     permission: 'report.read',
     group: 'Administration',
-    available: false,
+    available: true,
   },
   {
     key: 'audit-log',
@@ -149,7 +149,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/audit-log',
     permission: 'auditLog.read',
     group: 'Administration',
-    available: false,
+    available: true,
+  },
+  {
+    key: 'activity',
+    label: 'Activity',
+    href: '/activity',
+    permission: 'activityLog.read',
+    group: 'Administration',
+    available: true,
   },
   {
     key: 'settings',

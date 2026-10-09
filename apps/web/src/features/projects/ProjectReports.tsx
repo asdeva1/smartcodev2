@@ -240,9 +240,9 @@ function DownloadButtons({
   query: string;
   disabled: boolean;
 }) {
-  const [busy, setBusy] = useState<'xlsx' | 'csv' | null>(null);
+  const [busy, setBusy] = useState<'xlsx' | 'csv' | 'pdf' | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const download = async (format: 'xlsx' | 'csv') => {
+  const download = async (format: 'xlsx' | 'csv' | 'pdf') => {
     setBusy(format);
     setError(null);
     try {
@@ -275,6 +275,14 @@ function DownloadButtons({
         onClick={() => download('csv')}
       >
         {busy === 'csv' ? 'Preparing…' : 'Download CSV'}
+      </Button>
+      <Button
+        variant="outlined"
+        size="small"
+        disabled={disabled || busy !== null}
+        onClick={() => download('pdf')}
+      >
+        {busy === 'pdf' ? 'Preparing…' : 'Download PDF'}
       </Button>
       {error && (
         <Typography variant="caption" color="error" role="alert">

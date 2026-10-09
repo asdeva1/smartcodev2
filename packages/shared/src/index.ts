@@ -16,3 +16,4 @@ export * from './audits.js';
 export * from './my-account.js';
 export * from './dashboards.js';
 export * from './charts.js';
+export * from './logs.js';
