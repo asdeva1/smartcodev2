@@ -170,7 +170,11 @@ describeDb('Mandatory end-to-end workflow (HTTP + PostgreSQL)', () => {
       })
       .expect((res) => {
         // Refused either as an HTTP error or as a rejected row in the result.
-        const refused = res.status >= 400 || JSON.stringify(res.body).includes('"valid":0') || res.body.committed === 0 || res.body.applied === 0;
+        const refused =
+          res.status >= 400 ||
+          JSON.stringify(res.body).includes('"valid":0') ||
+          res.body.committed === 0 ||
+          res.body.applied === 0;
         expect({ status: res.status, body: res.body, refused }).toMatchObject({ refused: true });
       });
     const holders = await db.sql(

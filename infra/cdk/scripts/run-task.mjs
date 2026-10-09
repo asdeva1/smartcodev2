@@ -3,7 +3,7 @@
  * Runs a one-off ECS Fargate task (migrations, status, diff, Manager bootstrap), waits for it to stop,
  * prints its CloudWatch logs and exits with the container's exit code. Runs on the operator's machine.
  *
- *   node scripts/run-task.mjs --profile P --region R --cluster C --task-def ARN --subnets a,b --security-group sg-x \
+ *   node scripts/run-task.mjs [--profile P] --region R --cluster C --task-def ARN --subnets a,b --security-group sg-x \
  *        [--command "pnpm exec prisma migrate status"] [--env KEY=value --env KEY2=value2]
  *
  * Logs are the application's own logs (the API never logs secrets or tokens). Nothing secret is passed here.
@@ -19,13 +19,14 @@ const opt = (name) => {
   return i >= 0 ? argv[i + 1] : undefined;
 };
 const all = (name) => argv.flatMap((a, i) => (a === `--${name}` ? [argv[i + 1]] : []));
-for (const required of ['profile', 'region', 'cluster', 'task-def', 'subnets', 'security-group']) {
+for (const required of ['region', 'cluster', 'task-def', 'subnets', 'security-group']) {
   if (!opt(required)) {
     console.error(`Missing --${required}`);
     process.exit(2);
   }
 }
-const base = ['--profile', opt('profile'), '--region', opt('region')];
+// --profile is optional: CI authenticates through GitHub OIDC environment credentials.
+const base = [...(opt('profile') ? ['--profile', opt('profile')] : []), '--region', opt('region')];
 // The AWS CLI is Python: on Windows its default console codec (cp1252) cannot print Prisma's unicode log characters.
 const cliEnv = { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' };
 const aws = (...a) =>
