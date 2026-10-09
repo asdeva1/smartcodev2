@@ -82,7 +82,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/charts',
     permission: 'chart.read',
     group: 'Operations',
-    available: false,
+    available: true,
   },
   {
     key: 'allocation',

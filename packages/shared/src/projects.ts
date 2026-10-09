@@ -243,8 +243,8 @@ export const reportQuerySchema = z
   });
 export type ReportQuery = z.infer<typeof reportQuerySchema>;
 
-/** Downloadable report formats: Excel workbook or CSV (opens in Excel too). */
-export const REPORT_EXPORT_FORMATS = ['xlsx', 'csv'] as const;
+/** Downloadable report formats: Excel workbook, CSV (opens in Excel too) or a branded PDF. */
+export const REPORT_EXPORT_FORMATS = ['xlsx', 'csv', 'pdf'] as const;
 export type ReportExportFormat = (typeof REPORT_EXPORT_FORMATS)[number];
 export const EXPORTABLE_REPORTS = ['production', 'quality'] as const;
 export type ExportableReport = (typeof EXPORTABLE_REPORTS)[number];

@@ -193,8 +193,21 @@ describeDb('Coder workspace: open a chart, enter ICDs and DOS, submit (HTTP + Po
     await wb.xlsx.load(xl.body as never);
     expect(wb.worksheets[0]?.name).toBe('Quality report');
 
+    const pdf = await as(app, manager)
+      .get(`${base}/production/export?range=today&format=pdf`)
+      .buffer(true)
+      .parse((res, cb) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => cb(null, Buffer.concat(chunks)));
+      })
+      .expect(200);
+    expect(pdf.headers['content-type']).toContain('application/pdf');
+    expect(pdf.headers['content-disposition']).toMatch(/\.pdf"/);
+    expect((pdf.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+
     await as(app, manager).get(`${base}/nonsense/export`).expect(404);
-    await as(app, manager).get(`${base}/production/export?format=pdf`).expect(422);
+    await as(app, manager).get(`${base}/production/export?format=docx`).expect(422);
   });
 
   it('a chart can be submitted straight from Allocated (open and submit in one step)', async () => {
