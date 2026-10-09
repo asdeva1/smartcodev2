@@ -296,6 +296,7 @@ function Visitors() {
             value={date}
             onChange={(e) => setDate(e.target.value)}
             slotProps={{ inputLabel: { shrink: true } }}
+            sx={{ width: 180 }}
           />
         </Box>
         {(error ?? list.error) && <Alert severity="error">{error ?? list.error}</Alert>}
