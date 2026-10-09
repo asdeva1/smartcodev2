@@ -13,6 +13,31 @@ import NotFound from '@/app/not-found';
 import ManagerDashboardPage from '@/app/(workspace)/manager/page';
 import { renderWithTheme } from './render';
 
+const EMPTY_DASHBOARD = {
+  asOf: '2026-10-09T10:00:00.000Z',
+  timeZone: 'Asia/Kolkata',
+  monthFrom: '2026-10-01',
+  filter: null,
+  people: { projects: 0, teams: 0, activeTeamLeads: 0, activeAuditors: 0, activeCoders: 0 },
+  charts: {
+    total: 0,
+    completed: 0,
+    pendingAllocation: 0,
+    inProgress: 0,
+    pendingAudit: 0,
+    reviewRequired: 0,
+    pendingRework: 0,
+    byStatus: {},
+  },
+  audits: { pending: 0, completed: 0 },
+  production: {
+    today: { charts: 0, pages: 0, icds: 0, dos: 0 },
+    month: { charts: 0, pages: 0, icds: 0, dos: 0 },
+  },
+  performance: { cph: null, activeHours: 0, auditPercentage: null, auditedCharts: 0, totalErrors: 0 },
+  vendors: [],
+};
+
 describe('BrandLogo — official logo only', () => {
   it('serves the synced official asset with original proportions', () => {
     renderWithTheme(<BrandLogo width={298} />);
@@ -57,30 +82,38 @@ describe('pages show the logo', () => {
   });
 
   it('manager workspace renders the shell with the logo and empty state once signed in', async () => {
+    const profile = {
+      employee: {
+        id: 'e1',
+        employeeCode: 'MGR-1',
+        fullName: 'Test Manager',
+        email: 'm@example.test',
+        role: 'MANAGER',
+        status: 'ACTIVE',
+        vendorId: null,
+        loginName: null,
+        loginNameEligible: false,
+      },
+      permissions: { 'dashboard.manager': 'ORG', 'employee.read': 'ORG' },
+    };
+    const reply = (body: unknown) =>
+      new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            employee: {
-              id: 'e1',
-              employeeCode: 'MGR-1',
-              fullName: 'Test Manager',
-              email: 'm@example.test',
-              role: 'MANAGER',
-              status: 'ACTIVE',
-              vendorId: null,
-              loginName: null,
-              loginNameEligible: false,
-            },
-            permissions: { 'dashboard.manager': 'ORG', 'employee.read': 'ORG' },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
+      vi.fn(async (url: string) =>
+        reply(
+          url.includes('/auth/me')
+            ? profile
+            : url.includes('/vendors')
+              ? { items: [], page: 1, pageSize: 100, total: 0 }
+              : url.includes('/notifications')
+                ? { unread: 0, items: [] }
+                : EMPTY_DASHBOARD,
         ),
       ),
     );
     renderWithTheme(<ManagerDashboardPage />);
-    expect(await screen.findByText('No production data yet')).toBeInTheDocument();
+    expect(await screen.findByText('Active projects')).toBeInTheDocument();
     expect(screen.getAllByAltText(/SmartCode/).length).toBeGreaterThan(0);
     vi.unstubAllGlobals();
   });
