@@ -16,6 +16,10 @@ Status values: **Met** (enforced and tested), **Met (config)** (enforced by infr
 | Route policy test                           | `apps/api/test/route-policy.int-spec.ts` | Every route must declare a permission or `@AuthenticatedOnly`                                                       |
 | Live smoke checks                           | `pnpm smoke`                             | Headers, anonymous 401s, no stack traces                                                                            |
 
+### Known advisories accepted (development tooling only)
+
+`pnpm audit` (all dependencies, not only production) reports two issues with no patched version published: `braces` (via the Next.js ESLint plugin) and `sprintf-js` (via Jest). Both are used only while developing and testing and are not part of the API image or the web build. They are re-checked weekly by the security workflow.
+
 ## 2. ASVS checklist
 
 ### V2 Authentication

@@ -19,6 +19,7 @@
     "test:web": "turbo run test --filter=@smartcode/web",
     "test:e2e": "pnpm --filter @smartcode/e2e e2e",
     "smoke": "node scripts/smoke.mjs",
+    "loadtest": "node scripts/loadtest.mjs",
     "secrets:check": "node scripts/check-secrets.mjs",
     "env:check": "node scripts/check-env.mjs",
     "db:generate": "pnpm --filter @smartcode/api db:generate",
