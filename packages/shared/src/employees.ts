@@ -199,3 +199,13 @@ export interface CsvResult {
 
 export const EMPLOYEE_CSV_COLUMNS = ['Employee Name', 'Employee ID', 'Email', 'Role'] as const;
 export const LOGIN_NAME_CSV_COLUMNS = ['Login Name', 'Email'] as const;
+
+/** One entry in a person's history (from the audit trail): who did what to this employee, and when. */
+export interface EmployeeTimelineEntry {
+  id: string;
+  action: string;
+  actor: { id: string; fullName: string } | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  at: string;
+}

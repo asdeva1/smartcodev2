@@ -29,6 +29,13 @@ interface Probe {
 const PROBES: Probe[] = [
   { name: 'list employees', permission: 'employee.read', method: 'get', url: '/employees' },
   { name: 'read employee', permission: 'employee.read', method: 'get', url: `/employees/${NIL}` },
+  { name: 'export employees', permission: 'employee.read', method: 'get', url: '/employees/export' },
+  {
+    name: 'employee timeline',
+    permission: 'employee.read',
+    method: 'get',
+    url: `/employees/${NIL}/timeline`,
+  },
   { name: 'directory options', permission: 'employee.read', method: 'get', url: '/employees/options' },
   {
     name: 'create employee',

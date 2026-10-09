@@ -14,13 +14,14 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import {
   type EmployeeRecord,
+  type EmployeeTimelineEntry,
   ROLES,
   ROLE_LABELS,
   type Role,
   employeeCreateSchema,
   isLoginNameEligibleRole,
 } from '@smartcode/shared';
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { type DirectoryOptions, EmployeeStatusChip, formatDate, problemText } from './common';
 
@@ -244,6 +245,60 @@ export function AddEmployeeDialog({
 
 // ───────── View / edit ─────────
 
+const ACTION_LABELS: Record<string, string> = {
+  'EMPLOYEE.CREATED': 'Account created',
+  'EMPLOYEE.UPDATED': 'Details changed',
+  'EMPLOYEE.ACTIVATION_SENT': 'Activation link sent',
+  'EMPLOYEE.DEACTIVATED': 'Deactivated',
+  'EMPLOYEE.REACTIVATED': 'Reactivated',
+  'EMPLOYEE.ROLE_CHANGED': 'Role changed',
+  'EMPLOYEE.PASSWORD_RESET_TRIGGERED': 'Password reset link sent',
+  'EMPLOYEE.ACTIVATED': 'Account activated',
+  'EMPLOYEE.IMPORTED': 'Imported from a file',
+};
+const actionLabel = (a: string) =>
+  ACTION_LABELS[a] ??
+  a
+    .replace(/^EMPLOYEE\./, '')
+    .toLowerCase()
+    .replaceAll('_', ' ');
+
+function EmployeeTimeline({ employeeId }: { employeeId: string }) {
+  const [entries, setEntries] = useState<EmployeeTimelineEntry[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    apiFetch<EmployeeTimelineEntry[]>(`/employees/${employeeId}/timeline`)
+      .then((d) => live && setEntries(d))
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [employeeId]);
+  return (
+    <Box>
+      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+        History
+      </Typography>
+      {failed && <Typography color="text.secondary">The history could not be loaded.</Typography>}
+      {entries && entries.length === 0 && <Typography color="text.secondary">No history yet.</Typography>}
+      {entries && entries.length > 0 && (
+        <Box component="ul" sx={{ m: 0, pl: 2.5, maxHeight: 220, overflow: 'auto' }}>
+          {entries.map((e) => (
+            <li key={e.id}>
+              <Typography variant="body2">
+                {actionLabel(e.action)}
+                {e.actor ? ` by ${e.actor.fullName}` : ''} ·{' '}
+                {new Date(e.at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+              </Typography>
+            </li>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 export function EmployeeDetailDialog({
   employee,
   canEdit,
@@ -277,6 +332,7 @@ export function EmployeeDetailDialog({
     ['Team', employee.team?.name ?? '—'],
     ['Team Lead', employee.teamLead?.fullName ?? '—'],
     ['Projects', employee.projects.length ? employee.projects.map((p) => p.name).join(', ') : '—'],
+    ['Login Name', employee.loginName ?? '—'],
     ['Created', formatDate(employee.createdAt)],
     ['Activated', formatDate(employee.activatedAt)],
   ];
@@ -323,6 +379,7 @@ export function EmployeeDetailDialog({
           </Box>
         ))}
       </Box>
+      <EmployeeTimeline employeeId={employee.id} />
     </FormDialog>
   );
 }

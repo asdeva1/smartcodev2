@@ -31,7 +31,7 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { EmptyState } from '@/components/EmptyState';
 import { useSession } from '@/features/auth/session';
-import { apiFetch } from '@/lib/api';
+import { apiDownload, apiFetch, saveBlob } from '@/lib/api';
 import { CsvImportDialog } from './CsvImportDialog';
 import {
   type DirectoryOptions,
@@ -129,6 +129,17 @@ export function EmployeeDirectory() {
     setPage(0);
   };
 
+  async function exportCsv() {
+    try {
+      const { blob, filename } = await apiDownload(
+        `/employees/export${toQuery({ ...filters, sort: sort.field, direction: sort.direction })}`,
+      );
+      saveBlob(blob, filename);
+    } catch (e) {
+      setError(problemText(e, 'The directory could not be exported.'));
+    }
+  }
+
   async function act(label: string, path: string, body?: object) {
     try {
       await apiFetch(path, { method: 'POST', ...(body ? { body: JSON.stringify(body) } : {}) });
@@ -200,6 +211,9 @@ export function EmployeeDirectory() {
               Send activation links{selected.size ? ` (${selected.size})` : ''}
             </Button>
           )}
+          <Button variant="outlined" onClick={() => void exportCsv()}>
+            Export CSV
+          </Button>
           {canCreate && (
             <>
               <Button variant="outlined" onClick={() => setDialog({ kind: 'import' })}>
@@ -340,6 +354,7 @@ export function EmployeeDirectory() {
                   <TableCell>Team Lead</TableCell>
                   <TableCell>Project</TableCell>
                   <TableCell>Vendor</TableCell>
+                  <TableCell>Login Name</TableCell>
                   <TableCell>{head('status', 'Status')}</TableCell>
                   <TableCell>{head('createdAt', 'Created')}</TableCell>
                   <TableCell>{head('activatedAt', 'Activated')}</TableCell>
@@ -368,6 +383,7 @@ export function EmployeeDirectory() {
                       {e.projects.length ? e.projects.map((p) => p.name).join(', ') : '—'}
                     </TableCell>
                     <TableCell>{e.vendor?.name ?? 'In-house'}</TableCell>
+                    <TableCell>{e.loginName ?? '—'}</TableCell>
                     <TableCell>
                       <EmployeeStatusChip status={e.status} />
                     </TableCell>

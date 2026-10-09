@@ -37,3 +37,9 @@ stateDiagram-v2
 - **Login Names.** Eligible roles: Coder, Auditor, Team Lead, Group Coach/SME. Manager, HR and Vendor Admin do not use one. Only an ACTIVE employee can receive one; one active name per employee, one active employee per name; assigning a new name ends the previous one. Assignment (single, release and CSV) is Manager-only; reading follows the employee scope. Eligibility is enforced by a PostgreSQL trigger, so no code path can bypass it. A Login Name is an operational identifier — authentication is always email + password.
 - **Bulk CSV.** `Employee Name, Employee ID, Email, Role` only (Password, Team and Login Name columns are rejected). Stateless: preview (nothing written) then commit (re-validated, so a row that became a duplicate in between is not created twice). Both rows of a repeated Employee ID/email are flagged. Modes: valid-only or all-or-nothing. Formula-trigger values (`= + - @`) are rejected. Importing does not email anyone; sending activation links is a separate step (bulk or per person).
 - **Login Name CSV.** `Employee Email, Login Name`. Detects unknown email, inactive, pending, ineligible role, duplicate or already-assigned Login Name, and a repeated employee; warns when a name would replace the current one.
+
+## Directory additions (Phase 12 branch)
+
+- **Export CSV** (`GET /employees/export`): same filters, scope and sort as the list, up to 10,000 rows; columns follow module 3 (Employee ID, Name, Email, Role, Team, Team Lead, Projects, Vendor, Status, Login Name, Created, Activated). Cells that start with `= + - @` are neutralised.
+- **Login Name column** in the directory table and the employee detail.
+- **History** (`GET /employees/:id/timeline`): the person's audit-trail entries, newest first (rule 9). Visible to whoever may read that employee; others get 404.
