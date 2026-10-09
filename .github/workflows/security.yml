@@ -37,7 +37,7 @@ jobs:
       - name: Build API image
         run: docker build -f apps/api/Dockerfile --target runtime -t smartcode-api:scan .
       - name: Scan image (fixable HIGH/CRITICAL findings fail the build)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0 (pinned to the commit; the project retagged after a supply-chain incident)
         with:
           image-ref: smartcode-api:scan
           severity: HIGH,CRITICAL
