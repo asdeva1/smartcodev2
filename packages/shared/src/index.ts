@@ -14,3 +14,4 @@ export * from './organization.js';
 export * from './projects.js';
 export * from './audits.js';
 export * from './my-account.js';
+export * from './dashboards.js';
