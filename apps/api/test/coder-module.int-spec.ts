@@ -138,6 +138,7 @@ describeDb('Coder module: hold, remarks, dashboard and notifications (HTTP + Pos
       auditPercentage: null,
       auditedCharts: 0,
       onHold: 0,
+      projects: [{ name: 'Coder module', client: 'Acme' }],
     });
     // 1 chart in ~1 active hour.
     expect(res.body.cph).toBeGreaterThanOrEqual(0.9);

@@ -190,6 +190,7 @@ function Workspace({ chartRef }: { chartRef: string }) {
             )}
             <Box sx={{ display: 'grid', gap: 2 }}>
               <ReadOnlyField label="Chart ID" value={chart.chartId} />
+              <ReadOnlyField label="Project" value={`${chart.project.client} · ${chart.project.name}`} />
               <ReadOnlyField label="No of pages" value={chart.pages ?? ''} />
               <TextField
                 label="No of ICDs"

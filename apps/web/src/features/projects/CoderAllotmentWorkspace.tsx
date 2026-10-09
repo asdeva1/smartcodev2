@@ -99,6 +99,16 @@ function Allotment() {
             </Box>
             <Box>
               <Typography variant="body2" color="text.secondary">
+                Allocated project{dash && dash.projects.length > 1 ? 's' : ''}
+              </Typography>
+              <Typography variant="h5" component="p" sx={{ mt: 0.75 }}>
+                {dash && dash.projects.length > 0
+                  ? dash.projects.map((p) => `${p.client} · ${p.name}`).join(', ')
+                  : 'None yet'}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="body2" color="text.secondary">
                 Your Login Name
               </Typography>
               <Typography variant="h5" component="p" sx={{ mt: 0.75 }}>

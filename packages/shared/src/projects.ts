@@ -374,6 +374,8 @@ export interface CoderDashboard {
   totalErrors: number;
   onHold: number;
   pendingWork: number;
+  /** Projects the coder currently has charts allocated in. */
+  projects: { id: string; name: string; client: string }[];
 }
 
 export interface NotificationItem {

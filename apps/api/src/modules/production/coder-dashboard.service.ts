@@ -27,7 +27,7 @@ export class CoderDashboardService {
       status: { in: ['SUBMITTED', 'SUPERSEDED'] as ('SUBMITTED' | 'SUPERSEDED')[] },
     };
 
-    const [totalCharts, todayCharts, timed, audits, open, held] = await Promise.all([
+    const [totalCharts, todayCharts, timed, audits, open, held, allocated] = await Promise.all([
       db.productionEntry.findMany({ where: submitted, distinct: ['chartId'], select: { chartId: true } }),
       db.productionEntry.findMany({
         where: { ...submitted, submittedAt: { gte: todayStart } },
@@ -57,7 +57,24 @@ export class CoderDashboardService {
           chart: { status: 'IN_PRODUCTION', heldAt: { not: null } },
         },
       }),
+      db.chartAllocation.findMany({
+        where: { employeeId: me, status: 'ACTIVE' },
+        distinct: ['chartId'],
+        select: {
+          chart: {
+            select: { project: { select: { id: true, name: true, client: { select: { name: true } } } } },
+          },
+        },
+      }),
     ]);
+    const projects = [
+      ...new Map(
+        allocated.map((a) => [
+          a.chart.project.id,
+          { id: a.chart.project.id, name: a.chart.project.name, client: a.chart.project.client.name },
+        ]),
+      ).values(),
+    ].sort((a, b) => a.name.localeCompare(b.name));
 
     const hours = (timed._sum.activeSeconds ?? 0) / 3600;
     const cph = hours > 0 ? round1(timed._count._all / hours) : null;
@@ -80,6 +97,7 @@ export class CoderDashboardService {
       totalErrors: errors,
       onHold: held,
       pendingWork: open,
+      projects,
     };
   }
 }

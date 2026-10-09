@@ -325,6 +325,7 @@ describe('Coder portal: My charts', () => {
           totalErrors: 3,
           onHold: 1,
           pendingWork: 2,
+          projects: [{ id: 'p1', name: 'Cardiology Q4', client: 'Acme Health' }],
         }),
       'GET /allocation/mine': () =>
         json({
@@ -355,6 +356,8 @@ describe('Coder portal: My charts', () => {
     expect(within(group).getByText('7')).toBeInTheDocument();
     expect(within(group).getByText('5.5')).toBeInTheDocument();
     expect(within(group).getByText('96.4%')).toBeInTheDocument();
+    expect(await screen.findByText('Allocated project')).toBeInTheDocument();
+    expect(screen.getAllByText('Acme Health · Cardiology Q4').length).toBeGreaterThan(1);
     expect(await screen.findByText('On hold')).toBeInTheDocument();
   });
 
@@ -395,6 +398,9 @@ describe('Coder portal: chart workspace', () => {
     const chartId = await screen.findByLabelText('Chart ID');
     expect(chartId).toHaveValue('CH-1001');
     expect(chartId).toHaveAttribute('readonly');
+    const project = screen.getByLabelText('Project');
+    expect(project).toHaveValue('Acme Health · Cardiology Q4');
+    expect(project).toHaveAttribute('readonly');
     const pages = screen.getByLabelText('No of pages');
     expect(pages).toHaveValue('12');
     expect(pages).toHaveAttribute('readonly');
