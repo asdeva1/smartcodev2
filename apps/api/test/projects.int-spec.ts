@@ -3,7 +3,7 @@ import { ROLES, can, type Role } from '@smartcode/shared';
 import { Fixtures } from './db/fixtures';
 import { createTestDb, describeDb, type TestDb } from './db/harness';
 import { createDbApp } from './helpers';
-import { as, bootstrapAndSignInManager, createActiveEmployee, type Session } from './auth-helpers';
+import { anonymous, as, bootstrapAndSignInManager, createActiveEmployee, type Session } from './auth-helpers';
 
 jest.setTimeout(120_000);
 
@@ -676,6 +676,27 @@ other@vlms.com,coder.a@example.test,CH-2001,1,,`,
         });
         const res = await upload([T, ...rows].join('\n')).expect(200);
         expect(res.body).toMatchObject({ committed: true, created: 600 });
+      });
+
+      it('My account: every role sees only their own details, with Client Login and current projects', async () => {
+        const mine = await as(app, coderC.session).get('/auth/my-account').expect(200);
+        expect(mine.body).toMatchObject({
+          fullName: 'Coder R',
+          employeeCode: 'p5-cr',
+          email: 'coder.r@example.test',
+          role: 'CODER',
+          status: 'ACTIVE',
+          loginName: 'coderr@vlms.com',
+          vendor: null,
+          team: null,
+        });
+        expect(mine.body.projects).toEqual([
+          expect.objectContaining({ id: repo.id, name: 'Repository flow', projectRole: 'CODER' }),
+        ]);
+        const lead2 = await as(app, lead.session).get('/auth/my-account').expect(200);
+        expect(lead2.body).toMatchObject({ fullName: 'Tina Lead', role: 'TEAM_LEAD', loginName: null });
+        await as(app, manager).get('/auth/my-account').expect(200);
+        await anonymous(app).get('/auth/my-account').expect(401);
       });
 
       it('only the Manager can upload or assign charts (403)', async () => {

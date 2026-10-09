@@ -93,6 +93,12 @@ export class AuthController {
     return this.auth.profile(principal.employeeId);
   }
 
+  @Get('my-account')
+  @AuthenticatedOnly()
+  myAccount(@CurrentPrincipal() principal: Principal) {
+    return this.auth.myAccount(principal.employeeId);
+  }
+
   @Post('tokens/check')
   @Public()
   @HttpCode(200)

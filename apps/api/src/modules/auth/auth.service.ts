@@ -1,5 +1,6 @@
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import {
+  type MyAccount,
   type Permission,
   type Role,
   type Scope,
@@ -231,6 +232,46 @@ export class AuthService implements OnModuleInit {
         requestId: meta.requestId,
       });
     }
+  }
+
+  /** Everything the person may see about their own account. Only the caller's own record is ever read. */
+  async myAccount(employeeId: string): Promise<MyAccount> {
+    const e = await this.prisma.client.employee.findUniqueOrThrow({
+      where: { id: employeeId },
+      include: {
+        vendor: { select: { id: true, name: true } },
+        loginNameAssignments: { where: { endedAt: null }, include: { loginName: true } },
+        teamMemberships: {
+          where: { endedAt: null },
+          take: 1,
+          include: { team: { include: { teamLead: { select: { fullName: true } } } } },
+        },
+        projectAssignments: {
+          where: { endedAt: null },
+          include: { project: { select: { id: true, name: true, client: { select: { name: true } } } } },
+          orderBy: { startedAt: 'desc' },
+        },
+      },
+    });
+    const team = e.teamMemberships[0]?.team;
+    return {
+      fullName: e.fullName,
+      employeeCode: e.employeeCode,
+      email: e.email,
+      role: e.role,
+      status: e.status,
+      loginName: e.loginNameAssignments[0]?.loginName.value ?? null,
+      vendor: e.vendor,
+      team: team ? { id: team.id, name: team.name, teamLead: team.teamLead?.fullName ?? null } : null,
+      projects: e.projectAssignments.map((a) => ({
+        id: a.project.id,
+        name: a.project.name,
+        client: a.project.client.name,
+        projectRole: a.projectRole,
+      })),
+      activatedAt: e.activatedAt?.toISOString() ?? null,
+      createdAt: e.createdAt.toISOString(),
+    };
   }
 
   async profile(employeeId: string): Promise<SessionProfile> {
