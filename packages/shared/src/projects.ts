@@ -243,6 +243,20 @@ export const reportQuerySchema = z
   });
 export type ReportQuery = z.infer<typeof reportQuerySchema>;
 
+/** Downloadable report formats: Excel workbook or CSV (opens in Excel too). */
+export const REPORT_EXPORT_FORMATS = ['xlsx', 'csv'] as const;
+export type ReportExportFormat = (typeof REPORT_EXPORT_FORMATS)[number];
+export const EXPORTABLE_REPORTS = ['production', 'quality'] as const;
+export type ExportableReport = (typeof EXPORTABLE_REPORTS)[number];
+
+export const reportExportQuerySchema = z.object({
+  range: z.enum(REPORT_RANGES).default('today'),
+  from: dateOnly.optional(),
+  to: dateOnly.optional(),
+  format: z.enum(REPORT_EXPORT_FORMATS).default('xlsx'),
+});
+export type ReportExportQuery = z.infer<typeof reportExportQuerySchema>;
+
 export interface ReportPeriod {
   range: ReportRange;
   /** Inclusive dates in the organization's time zone. */

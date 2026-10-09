@@ -154,6 +154,49 @@ describeDb('Coder workspace: open a chart, enter ICDs and DOS, submit (HTTP + Po
     expect(reopen.body.status).toBe('PENDING_AUDIT');
   });
 
+  it('reports download as CSV and Excel, scoped exactly like the screen', async () => {
+    const base = `/projects/${projectId}/reports`;
+    const csv = (r: { text?: string }) => (r.text ?? '').replace(/^\uFEFF/, '');
+    const mgr = await as(app, manager).get(`${base}/production/export?range=today&format=csv`).expect(200);
+    expect(mgr.headers['content-type']).toContain('text/csv');
+    expect(mgr.headers['content-disposition']).toMatch(
+      /attachment; filename="Prod_production-report_.*\.csv"/,
+    );
+    expect(csv(mgr)).toContain('Coder,Client Login,Charts,Pages,ICDs,DOS');
+    expect(csv(mgr)).toContain('Coder A');
+    expect(csv(mgr)).toContain('Total,,1,12,5,2');
+
+    // A Coder downloads only their own work.
+    const own = await as(app, coderA.session)
+      .get(`${base}/production/export?range=today&format=csv`)
+      .expect(200);
+    expect(csv(own)).toContain('Coder A');
+    expect(csv(own)).not.toContain('Coder B');
+    const other = await as(app, coderB.session)
+      .get(`${base}/production/export?range=today&format=csv`)
+      .expect(200);
+    expect(csv(other)).not.toContain('Coder A');
+
+    // Excel is the default format and opens as a real workbook.
+    const xl = await as(app, manager)
+      .get(`${base}/quality/export?range=today`)
+      .buffer(true)
+      .parse((res, cb) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => cb(null, Buffer.concat(chunks)));
+      })
+      .expect(200);
+    expect(xl.headers['content-type']).toContain('spreadsheetml.sheet');
+    const { default: ExcelJS } = await import('exceljs');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(xl.body as Buffer);
+    expect(wb.worksheets[0]?.name).toBe('Quality report');
+
+    await as(app, manager).get(`${base}/nonsense/export`).expect(404);
+    await as(app, manager).get(`${base}/production/export?format=pdf`).expect(422);
+  });
+
   it('a chart can be submitted straight from Allocated (open and submit in one step)', async () => {
     await as(app, coderB.session)
       .post(`/production/charts/${chartIds['C-3']}/submit`, { icds: 0, dos: 0 })

@@ -98,3 +98,37 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, base = A
   }
   return body as T;
 }
+
+/** Fetches a file (Excel, CSV…) with the session cookie and returns it with the server's suggested file name. */
+export async function apiDownload(path: string, base = API_BASE): Promise<{ blob: Blob; filename: string }> {
+  const get = () => send(path, { headers: { accept: '*/*' } }, base);
+  let response = await get();
+  if (response.status === 401 && (await refreshSession(base))) response = await get();
+  if (!response.ok) {
+    const isJson = (response.headers.get('content-type') ?? '').includes('json');
+    const body = isJson ? ((await response.json()) as ProblemDetails) : null;
+    throw new ApiError(
+      body ?? {
+        type: 'about:blank',
+        title: response.statusText || 'Error',
+        status: response.status,
+        code: 'INTERNAL_ERROR',
+      },
+    );
+  }
+  const disposition = response.headers.get('content-disposition') ?? '';
+  const filename = /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? 'report';
+  return { blob: await response.blob(), filename };
+}
+
+/** Hands a downloaded file to the browser's normal save flow. */
+export function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

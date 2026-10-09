@@ -313,6 +313,42 @@ describe('Project detail', () => {
     expect(screen.getByLabelText('To')).toBeInTheDocument();
   });
 
+  it('Production report can be downloaded as Excel or CSV for the period on screen', async () => {
+    const user = userEvent.setup();
+    const created = vi.fn(() => 'blob:report');
+    Object.assign(URL, { createObjectURL: created, revokeObjectURL: vi.fn() });
+    const calls = mockApi({
+      'GET /auth/me': () => json(MANAGER),
+      'GET /projects/p1/reports/production/export': () =>
+        new Response('Coder\n', {
+          status: 200,
+          headers: {
+            'content-type': 'text/csv',
+            'content-disposition': 'attachment; filename="Cardiology_production-report_2026-10-09.csv"',
+          },
+        }),
+      'GET /projects/p1/reports/production': () =>
+        json({
+          period: { range: 'today', from: '2026-10-09', to: '2026-10-09', timeZone: 'Asia/Kolkata' },
+          totals: { charts: 0, pages: 0, icds: 0, dos: 0 },
+          rows: [],
+        }),
+      'GET /projects/p1': () => json(detail(MANUAL)),
+    });
+    renderWithTheme(<ProjectDetailWorkspace />);
+    await screen.findByRole('heading', { level: 2, name: /Cardiology Q4/ });
+    await user.click(screen.getByRole('tab', { name: 'Production report' }));
+    await user.click(await screen.findByRole('button', { name: 'Download CSV' }));
+    await waitFor(() => expect(created).toHaveBeenCalled());
+    expect(calls.some((c) => c.url.includes('reports/production/export?range=today&format=csv'))).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Download Excel' }));
+    await waitFor(() =>
+      expect(calls.some((c) => c.url.includes('reports/production/export?range=today&format=xlsx'))).toBe(
+        true,
+      ),
+    );
+  });
+
   it('Live tracking shows charts done today', async () => {
     const user = userEvent.setup();
     mockApi({

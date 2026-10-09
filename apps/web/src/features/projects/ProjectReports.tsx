@@ -2,6 +2,7 @@
 
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -16,6 +17,7 @@ import Typography from '@mui/material/Typography';
 import type { LiveTracking, ProductionReport, QualityReport, ReportRange } from '@smartcode/shared';
 import { useEffect, useState } from 'react';
 import { EmptyState } from '@/components/EmptyState';
+import { apiDownload, saveBlob } from '@/lib/api';
 import { useResource } from './shared';
 
 const num = { fontVariantNumeric: 'tabular-nums' } as const;
@@ -226,6 +228,63 @@ function RangePicker({
   );
 }
 
+/** Download the report on screen (same period, same scope) as Excel or CSV. */
+function DownloadButtons({
+  projectId,
+  type,
+  query,
+  disabled,
+}: {
+  projectId: string;
+  type: 'production' | 'quality';
+  query: string;
+  disabled: boolean;
+}) {
+  const [busy, setBusy] = useState<'xlsx' | 'csv' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const download = async (format: 'xlsx' | 'csv') => {
+    setBusy(format);
+    setError(null);
+    try {
+      const file = await apiDownload(
+        `/projects/${projectId}/reports/${type}/export?${query}&format=${format}`,
+      );
+      saveBlob(file.blob, file.filename);
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message ? e.message : 'The report could not be downloaded. Try again.',
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', ml: { sm: 'auto' } }}>
+      <Button
+        variant="outlined"
+        size="small"
+        disabled={disabled || busy !== null}
+        onClick={() => download('xlsx')}
+      >
+        {busy === 'xlsx' ? 'Preparing…' : 'Download Excel'}
+      </Button>
+      <Button
+        variant="outlined"
+        size="small"
+        disabled={disabled || busy !== null}
+        onClick={() => download('csv')}
+      >
+        {busy === 'csv' ? 'Preparing…' : 'Download CSV'}
+      </Button>
+      {error && (
+        <Typography variant="caption" color="error" role="alert">
+          {error}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 function usePeriod() {
   const [period, setPeriod] = useState<{ range: ReportRange; from: string; to: string }>({
     range: 'today',
@@ -250,7 +309,10 @@ export function ProductionReportPanel({ projectId }: { projectId: string }) {
   const data = report.data;
   return (
     <Box sx={{ display: 'grid', gap: 2 }}>
-      <RangePicker {...period} onChange={setPeriod} />
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+        <RangePicker {...period} onChange={setPeriod} />
+        <DownloadButtons projectId={projectId} type="production" query={query} disabled={!ready} />
+      </Box>
       {period.range === 'custom' && !ready && <Alert severity="info">Choose a start and end date.</Alert>}
       {report.error && <Alert severity="error">{report.error}</Alert>}
       {data && (
@@ -328,7 +390,10 @@ export function QualityReportPanel({ projectId }: { projectId: string }) {
   const data = report.data;
   return (
     <Box sx={{ display: 'grid', gap: 2 }}>
-      <RangePicker {...period} onChange={setPeriod} />
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+        <RangePicker {...period} onChange={setPeriod} />
+        <DownloadButtons projectId={projectId} type="quality" query={query} disabled={!ready} />
+      </Box>
       {period.range === 'custom' && !ready && <Alert severity="info">Choose a start and end date.</Alert>}
       {report.error && <Alert severity="error">{report.error}</Alert>}
       {data && (

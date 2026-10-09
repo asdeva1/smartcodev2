@@ -1,4 +1,16 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+  StreamableFile,
+} from '@nestjs/common';
 import {
   type AssignChart,
   type ChartIdList,
@@ -11,6 +23,7 @@ import {
   type ProjectListQuery,
   type ProjectMemberAdd,
   type ProjectUpdate,
+  type ReportExportQuery,
   type ReportQuery,
   type SubmitToClient,
   assignChartSchema,
@@ -24,6 +37,7 @@ import {
   projectListQuerySchema,
   projectMemberAddSchema,
   projectUpdateSchema,
+  reportExportQuerySchema,
   reportQuerySchema,
   submitToClientSchema,
 } from '@smartcode/shared';
@@ -33,7 +47,9 @@ import { Meta, type RequestMeta } from '../../core/auth/request-meta';
 import { ZodValidationPipe } from '../../core/validation/zod-validation.pipe';
 import { UuidParamPipe } from '../employees/uuid-param.pipe';
 import { ProjectAllocationService } from './project-allocation.service';
+import type { Response } from 'express';
 import { ProjectReportsService } from './project-reports.service';
+import { ReportExportService, assertExportable } from './report-export.service';
 import { ProjectsService } from './projects.service';
 
 /**
@@ -46,6 +62,7 @@ export class ProjectsController {
     private readonly projects: ProjectsService,
     private readonly allocation: ProjectAllocationService,
     private readonly reports: ProjectReportsService,
+    private readonly exports: ReportExportService,
   ) {}
 
   @Get()
@@ -259,5 +276,24 @@ export class ProjectsController {
     @Query(new ZodValidationPipe(reportQuerySchema)) q: ReportQuery,
   ) {
     return this.reports.quality(p, id, q);
+  }
+
+  /** Download a report as Excel (default) or CSV. Same scope and period rules as the on-screen report. */
+  @Get(':id/reports/:type/export')
+  @RequirePermission('report.read')
+  async exportReport(
+    @CurrentPrincipal() p: Principal,
+    @Param('id', new UuidParamPipe()) id: string,
+    @Param('type') type: string,
+    @Query(new ZodValidationPipe(reportExportQuerySchema)) q: ReportExportQuery,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const file = await this.exports.export(p, id, assertExportable(type), q, q.format);
+    res.set({
+      'Content-Type': file.contentType,
+      'Content-Disposition': `attachment; filename="${file.filename}"`,
+      'Cache-Control': 'no-store',
+    });
+    return new StreamableFile(file.body);
   }
 }
