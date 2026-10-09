@@ -104,7 +104,8 @@ function Dashboard() {
             label="Show"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            sx={{ minWidth: 240 }}
+            slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+            sx={{ width: 300, flex: 'none' }}
           >
             <MenuItem value="">In-house and all vendors</MenuItem>
             <MenuItem value={IN_HOUSE_FILTER}>In-house only</MenuItem>
