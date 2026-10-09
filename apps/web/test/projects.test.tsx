@@ -6,6 +6,7 @@ import { CoderAllotmentWorkspace } from '@/features/projects/CoderAllotmentWorks
 import { CoderChartWorkspace } from '@/features/projects/CoderChartWorkspace';
 import { ProjectDetailWorkspace } from '@/features/projects/ProjectDetailWorkspace';
 import { ProjectsWorkspace } from '@/features/projects/ProjectsWorkspace';
+import { buildAllocationCsv, parseChartIds } from '@/features/projects/AssignChartDialog';
 import { renderWithTheme } from './render';
 import { push } from './setup';
 
@@ -189,6 +190,47 @@ describe('Project detail', () => {
     for (const col of ['Login Name', 'Email ID', 'Chart ID', 'Pages', 'Page Bucket', 'Remarks']) {
       expect(within(dialog).getAllByText(new RegExp(col)).length).toBeGreaterThan(0);
     }
+  });
+
+  it('Assign chart: picks a coder, builds the allocation CSV from the typed Chart IDs and commits all-or-nothing', async () => {
+    const user = userEvent.setup();
+    const calls = mockApi({
+      'GET /auth/me': () => json(MANAGER),
+      'GET /projects/p1/charts': () => json(page([])),
+      'POST /projects/p1/allocation/commit': () =>
+        json({
+          committed: true,
+          created: 2,
+          skipped: 0,
+          createdIds: [],
+          preview: { rows: [], fileErrors: [] },
+        }),
+      'GET /projects/p1': () => json(detail(MANUAL)),
+    });
+    renderWithTheme(<ProjectDetailWorkspace />);
+    const tabs = await screen.findByRole('tablist', { name: 'Project sections' });
+    await user.click(within(tabs).getByRole('tab', { name: 'Chart allocation' }));
+    await user.click((await screen.findAllByRole('button', { name: 'Assign chart' }))[0]!);
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('combobox', { name: 'Coder on this project' }));
+    await user.click(await screen.findByRole('option', { name: /Naveen P/ }));
+    expect(within(dialog).getByLabelText(/Login Name/)).toHaveValue('naveen@vlms.com');
+    await user.type(within(dialog).getByLabelText(/Chart ID/), 'CH-1{enter}CH-2');
+    await user.click(within(dialog).getByRole('button', { name: /Assign 2 charts/ }));
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith('/allocation/commit'))).toBe(true));
+    const body = JSON.parse(String(calls.find((c) => c.url.endsWith('/allocation/commit'))!.init.body));
+    expect(body.mode).toBe('all-or-nothing');
+    expect(body.csv).toBe(
+      'Login Name,Email ID,Chart ID,Pages,Page Bucket,Remarks\n' +
+        'naveen@vlms.com,naveen@smartcluestech.com,CH-1,,,\n' +
+        'naveen@vlms.com,naveen@smartcluestech.com,CH-2,,,',
+    );
+  });
+
+  it('Assign chart helpers: de-duplicate Chart IDs and quote CSV cells', () => {
+    expect(parseChartIds('A1, A2;\nA1\n\n A3 ')).toEqual(['A1', 'A2', 'A3']);
+    const csv = buildAllocationCsv({ loginName: 'l', email: 'e@x.y', chartIds: ['C'], remarks: 'a, "b"' });
+    expect(csv.split('\n')[1]).toBe('l,e@x.y,C,,,"a, ""b"""');
   });
 
   it('Automatic project: no chart allocation option', async () => {

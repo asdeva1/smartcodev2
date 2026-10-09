@@ -31,6 +31,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { CsvImportDialog } from '@/features/employees/CsvImportDialog';
 import { apiFetch } from '@/lib/api';
 import { FormDialog, useAction, usePagedList } from '../admin/ui';
+import { AssignChartDialog } from './AssignChartDialog';
 import { chartStatusLabel, formatDateTime } from './shared';
 
 const PULLABLE = new Set(['ALLOCATED', 'IN_PRODUCTION']);
@@ -49,7 +50,7 @@ const STATUS_FILTERS = [
   'COMPLETED',
 ];
 
-type Dialog = 'upload' | 'pullback' | 'submit' | null;
+type Dialog = 'upload' | 'assign' | 'pullback' | 'submit' | null;
 
 export function ProjectAllocation({
   project,
@@ -100,6 +101,9 @@ export function ProjectAllocation({
       >
         <Button variant="contained" disabled={!active} onClick={() => setDialog('upload')}>
           Upload allocation CSV
+        </Button>
+        <Button variant="outlined" disabled={!active} onClick={() => setDialog('assign')}>
+          Assign chart
         </Button>
         <Button
           variant="outlined"
@@ -293,6 +297,19 @@ export function ProjectAllocation({
             setDialog(null);
             if (changed) {
               onToast('Charts allotted. Coders can see them in their portal.');
+              refreshAll();
+            }
+          }}
+        />
+      )}
+      {dialog === 'assign' && (
+        <AssignChartDialog
+          projectId={project.id}
+          members={project.members}
+          onClose={(message) => {
+            setDialog(null);
+            if (message) {
+              onToast(message);
               refreshAll();
             }
           }}
