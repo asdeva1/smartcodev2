@@ -6,7 +6,9 @@ import {
   type ApprovalPage,
   type ApprovalRecord,
   type ApprovalType,
+  type RoleChange,
   APPROVAL_TYPE_LABELS,
+  APPROVAL_TYPES,
   can,
 } from '@smartcode/shared';
 import { ActivityLogService } from '../../core/audit/activity-log.service';
@@ -24,9 +26,14 @@ import { ProjectsService } from '../projects/projects.service';
 /** Who may ask for what. A Manager decides, so a Manager never asks. */
 const REQUESTERS: Record<ApprovalType, readonly string[]> = {
   EMPLOYEE_DEACTIVATION: ['TEAM_LEAD', 'HR', 'VENDOR_ADMIN', 'GROUP_COACH'],
+  EMPLOYEE_REACTIVATION: ['HR', 'VENDOR_ADMIN', 'TEAM_LEAD'],
+  ROLE_CHANGE: ['HR', 'VENDOR_ADMIN', 'TEAM_LEAD'],
   LOGIN_NAME_CHANGE: ['TEAM_LEAD', 'HR', 'VENDOR_ADMIN', 'GROUP_COACH'],
   PROJECT_CLOSURE: ['TEAM_LEAD', 'VENDOR_ADMIN', 'GROUP_COACH'],
+  PROJECT_REOPEN: ['TEAM_LEAD', 'VENDOR_ADMIN', 'GROUP_COACH'],
 };
+const PROJECT_TYPES: readonly ApprovalType[] = ['PROJECT_CLOSURE', 'PROJECT_REOPEN'];
+type Payload = { reason?: string; loginName?: string; role?: string };
 
 const notFound = () => new ProblemException(404, 'NOT_FOUND', 'Approval request not found');
 
@@ -74,7 +81,7 @@ export class ApprovalsService {
       ...projects.map((p) => [p.id, p.name] as [string, string]),
     ]);
     return rows.map((r) => {
-      const payload = (r.payload ?? {}) as { reason?: string; loginName?: string };
+      const payload = (r.payload ?? {}) as Payload;
       return {
         id: r.id,
         type: r.type as ApprovalType,
@@ -82,7 +89,11 @@ export class ApprovalsService {
         subject: names.get(r.entityId) ?? 'Unknown',
         entityId: r.entityId,
         requester: { id: r.requester.id, fullName: r.requester.fullName, role: r.requester.role },
-        request: { reason: payload.reason ?? null, loginName: payload.loginName ?? null },
+        request: {
+          reason: payload.reason ?? null,
+          loginName: payload.loginName ?? null,
+          role: payload.role ?? null,
+        },
         comments: r.comments,
         decisionComments: r.decisionComments,
         resolvedBy: r.resolvedBy,
@@ -97,7 +108,7 @@ export class ApprovalsService {
     const sees = can(principal.role, 'approval.decide') && q.scope === 'all';
     const base: Prisma.ApprovalRequestWhereInput = {
       organizationId: principal.organizationId,
-      type: { in: ['EMPLOYEE_DEACTIVATION', 'LOGIN_NAME_CHANGE', 'PROJECT_CLOSURE'] },
+      type: { in: [...APPROVAL_TYPES] },
       ...(sees ? {} : { requesterId: principal.employeeId }),
     };
     const where = { ...base, ...(q.status ? { status: q.status } : {}) };
@@ -126,12 +137,14 @@ export class ApprovalsService {
       );
     }
     const db = this.prisma.client;
-    const isProject = input.type === 'PROJECT_CLOSURE';
+    const isProject = PROJECT_TYPES.includes(input.type);
     // The requester must be able to see the person or project, with the same scope rules as everywhere else.
     if (isProject) {
       const project = await this.projects.load(principal, input.entityId);
-      if (project.status === 'CLOSED')
+      if (input.type === 'PROJECT_CLOSURE' && project.status === 'CLOSED')
         throw new ProblemException(409, 'CONFLICT', 'This project is already closed');
+      if (input.type === 'PROJECT_REOPEN' && project.status !== 'CLOSED')
+        throw new ProblemException(409, 'CONFLICT', 'Only a closed project can be reopened');
     } else {
       const person = await this.employees.get(principal, input.entityId);
       if (person.id === principal.employeeId) {
@@ -139,6 +152,12 @@ export class ApprovalsService {
       }
       if (input.type === 'EMPLOYEE_DEACTIVATION' && person.status !== 'ACTIVE') {
         throw new ProblemException(409, 'CONFLICT', 'This person is not active');
+      }
+      if (input.type === 'EMPLOYEE_REACTIVATION' && person.status !== 'INACTIVE') {
+        throw new ProblemException(409, 'CONFLICT', 'Only an inactive person can be reactivated');
+      }
+      if (input.type === 'ROLE_CHANGE' && person.role === input.role) {
+        throw new ProblemException(422, 'VALIDATION_FAILED', 'This person already has that role');
       }
     }
     const pending = await db.approvalRequest.findFirst({
@@ -155,6 +174,7 @@ export class ApprovalsService {
     const payload = {
       ...(input.reason ? { reason: input.reason } : {}),
       ...(input.loginName ? { loginName: input.loginName } : {}),
+      ...(input.type === 'ROLE_CHANGE' && input.role ? { role: input.role } : {}),
     };
     const created = await this.prisma.transaction(
       { actorId: principal.employeeId, reason: 'Approval requested' },
@@ -264,14 +284,14 @@ export class ApprovalsService {
       where: {
         id,
         organizationId: principal.organizationId,
-        type: { in: ['EMPLOYEE_DEACTIVATION', 'LOGIN_NAME_CHANGE', 'PROJECT_CLOSURE'] },
+        type: { in: [...APPROVAL_TYPES] },
       },
       include: INCLUDE,
     });
     if (!request) throw notFound();
     if (request.status !== 'PENDING')
       throw new ProblemException(409, 'CONFLICT', 'This request has already been decided');
-    const payload = (request.payload ?? {}) as { reason?: string; loginName?: string };
+    const payload = (request.payload ?? {}) as Payload;
 
     const finish = (tx: Prisma.TransactionClient, status: 'APPROVED' | 'REJECTED') =>
       this.settle(tx, principal, meta, request, status, input.comments);
@@ -306,7 +326,7 @@ export class ApprovalsService {
     manager: Principal,
     type: ApprovalType,
     entityId: string,
-    payload: { reason?: string; loginName?: string },
+    payload: Payload,
     confirmOpenWork: boolean,
     meta: RequestMeta,
   ): Promise<void> {
@@ -319,8 +339,22 @@ export class ApprovalsService {
       );
     } else if (type === 'LOGIN_NAME_CHANGE') {
       await this.loginNames.assign(manager, entityId, payload.loginName ?? '', meta);
+    } else if (type === 'EMPLOYEE_REACTIVATION') {
+      await this.employees.reactivate(manager, entityId, meta);
+    } else if (type === 'ROLE_CHANGE') {
+      await this.employees.changeRole(
+        manager,
+        entityId,
+        { role: (payload.role ?? '') as RoleChange['role'], reason: payload.reason ?? 'Approved request' },
+        meta,
+      );
     } else {
-      await this.projects.update(manager, entityId, { status: 'CLOSED' }, meta);
+      await this.projects.update(
+        manager,
+        entityId,
+        { status: type === 'PROJECT_REOPEN' ? 'ACTIVE' : 'CLOSED' },
+        meta,
+      );
     }
   }
 

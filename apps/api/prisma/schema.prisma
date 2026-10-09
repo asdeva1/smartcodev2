@@ -213,6 +213,9 @@ model Organization {
   charts           Chart[]
   notifications    Notification[]
   approvalRequests ApprovalRequest[]
+  visitors         Visitor[]
+  visits           Visit[]
+  internalAuditReviews InternalAuditReview[]
   activityLogs     ActivityLog[]
   auditLogs        AuditLog[]
 
@@ -269,6 +272,10 @@ model Employee {
   reworksAssigned        Rework[]              @relation("ReworkAssignedCoder")
   reworksCreated         Rework[]              @relation("ReworkCreatedBy")
   notifications          Notification[]
+  hostedVisits           Visit[]                @relation("VisitHost")
+  registeredVisits       Visit[]                @relation("VisitRegisteredBy")
+  checkedInVisits        Visit[]                @relation("VisitCheckedInBy")
+  internalAuditReviews   InternalAuditReview[]
   approvalRequested      ApprovalRequest[]     @relation("ApprovalRequester")
   approvalResolved       ApprovalRequest[]     @relation("ApprovalResolver")
   approvalStepsAssigned  ApprovalStep[]        @relation("ApprovalStepApprover")
@@ -707,6 +714,7 @@ model Audit {
   auditor         Employee         @relation(fields: [auditorId], references: [id], onDelete: Restrict)
   previousAudit   Audit?           @relation("ReAuditChain", fields: [previousAuditId], references: [id], onDelete: Restrict)
   nextAudit       Audit?           @relation("ReAuditChain")
+  internalReview  InternalAuditReview?
   resolution      AuditResolution?
   rework          Rework?
 
@@ -895,4 +903,99 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([action, createdAt])
   @@map("audit_logs")
+}
+
+// ───────── Visitor Management (scope D-07 as drafted: register, host, check-in/out, badge) ─────────
+
+enum VisitStatus {
+  EXPECTED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+
+  @@map("visit_status")
+}
+
+/// A person who visits the office. Kept so a returning visitor is not typed again. No ID numbers are stored.
+model Visitor {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  fullName       String   @map("full_name") @db.VarChar(200)
+  company        String?  @db.VarChar(200)
+  phone          String?  @db.VarChar(32)
+  email          String?  @db.VarChar(254)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  visits       Visit[]
+
+  @@index([organizationId, fullName])
+  @@map("visitors")
+}
+
+/// One visit: who comes, whom they meet (the host), and when they came in and out.
+model Visit {
+  id             String      @id @default(uuid(7)) @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
+  visitorId      String      @map("visitor_id") @db.Uuid
+  hostId         String      @map("host_id") @db.Uuid
+  purpose        String      @db.VarChar(300)
+  expectedAt     DateTime?   @map("expected_at") @db.Timestamptz(3)
+  status         VisitStatus @default(EXPECTED)
+  /// Printed on the badge, e.g. V-20261010-003. Set at check-in.
+  badgeNumber    String?     @map("badge_number") @db.VarChar(32)
+  checkedInAt    DateTime?   @map("checked_in_at") @db.Timestamptz(3)
+  checkedInById  String?     @map("checked_in_by_id") @db.Uuid
+  checkedOutAt   DateTime?   @map("checked_out_at") @db.Timestamptz(3)
+  notes          String?     @db.VarChar(500)
+  registeredById String      @map("registered_by_id") @db.Uuid
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  visitor      Visitor      @relation(fields: [visitorId], references: [id], onDelete: Restrict)
+  host         Employee     @relation("VisitHost", fields: [hostId], references: [id], onDelete: Restrict)
+  registeredBy Employee     @relation("VisitRegisteredBy", fields: [registeredById], references: [id], onDelete: Restrict)
+  checkedInBy  Employee?    @relation("VisitCheckedInBy", fields: [checkedInById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status, createdAt])
+  @@index([visitorId])
+  @@index([hostId])
+  @@index([registeredById])
+  @@index([checkedInById])
+  @@map("visits")
+}
+
+// ───────── Internal Audit (scope D-07 DRAFT: Manager checks the quality of the audits themselves) ─────────
+
+enum InternalReviewOutcome {
+  AGREE
+  DISAGREE
+
+  @@map("internal_review_outcome")
+}
+
+/// The Manager re-scores an already audited chart independently. AGREE when the independent error count equals the
+/// auditor's total; the difference shows where auditors are too strict or too lenient.
+model InternalAuditReview {
+  id                String                @id @default(uuid(7)) @db.Uuid
+  organizationId    String                @map("organization_id") @db.Uuid
+  auditId           String                @unique @map("audit_id") @db.Uuid
+  reviewerId        String                @map("reviewer_id") @db.Uuid
+  /// Snapshot of the auditor's total errors when the review was recorded.
+  auditorErrors     Int                   @map("auditor_errors")
+  independentErrors Int                   @map("independent_errors")
+  outcome           InternalReviewOutcome
+  notes             String?               @db.VarChar(1000)
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  audit        Audit        @relation(fields: [auditId], references: [id], onDelete: Restrict)
+  reviewer     Employee     @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@index([reviewerId])
+  @@map("internal_audit_reviews")
 }

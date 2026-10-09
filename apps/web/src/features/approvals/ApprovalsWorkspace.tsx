@@ -29,6 +29,8 @@ import {
   type EmployeeRecord,
   type Page,
   type ProjectListRecord,
+  ROLE_LABELS,
+  ROLES,
 } from '@smartcode/shared';
 import { useState } from 'react';
 import { AppShell } from '@/components/AppShell';
@@ -63,7 +65,8 @@ function RequestDialog({
   const [loginName, setLoginName] = useState('');
   const [comments, setComments] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const isProject = type === 'PROJECT_CLOSURE';
+  const isProject = type === 'PROJECT_CLOSURE' || type === 'PROJECT_REOPEN';
+  const [role, setRole] = useState('');
   const people = useResource<Page<EmployeeRecord>>(
     type && !isProject ? '/employees?pageSize=100&status=ACTIVE' : null,
   );
@@ -77,7 +80,8 @@ function RequestDialog({
     const parsed = approvalCreateSchema.safeParse({
       type: type || undefined,
       entityId: entity?.id,
-      ...(type === 'EMPLOYEE_DEACTIVATION' ? { reason } : {}),
+      ...(type === 'EMPLOYEE_DEACTIVATION' || type === 'ROLE_CHANGE' ? { reason } : {}),
+      ...(type === 'ROLE_CHANGE' ? { role: role || undefined } : {}),
       ...(type === 'LOGIN_NAME_CHANGE' ? { loginName } : {}),
       comments,
     });
@@ -136,7 +140,23 @@ function RequestDialog({
           />
         )}
       />
-      {type === 'EMPLOYEE_DEACTIVATION' && (
+      {type === 'ROLE_CHANGE' && (
+        <TextField
+          select
+          label="New role"
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          error={Boolean(errors.role)}
+          helperText={errors.role}
+        >
+          {ROLES.map((r) => (
+            <MenuItem key={r} value={r}>
+              {ROLE_LABELS[r]}
+            </MenuItem>
+          ))}
+        </TextField>
+      )}
+      {(type === 'EMPLOYEE_DEACTIVATION' || type === 'ROLE_CHANGE') && (
         <TextField
           label="Reason"
           value={reason}
@@ -231,9 +251,9 @@ function DecideDialog({
 
 const REQUEST_TYPES: Record<string, ApprovalType[]> = {
   TEAM_LEAD: [...APPROVAL_TYPES],
-  GROUP_COACH: [...APPROVAL_TYPES],
+  GROUP_COACH: ['EMPLOYEE_DEACTIVATION', 'LOGIN_NAME_CHANGE', 'PROJECT_CLOSURE', 'PROJECT_REOPEN'],
   VENDOR_ADMIN: [...APPROVAL_TYPES],
-  HR: ['EMPLOYEE_DEACTIVATION', 'LOGIN_NAME_CHANGE'],
+  HR: ['EMPLOYEE_DEACTIVATION', 'EMPLOYEE_REACTIVATION', 'ROLE_CHANGE', 'LOGIN_NAME_CHANGE'],
 };
 
 function Approvals() {
@@ -337,6 +357,8 @@ function Approvals() {
                         {[
                           r.request.reason,
                           r.request.loginName,
+                          r.request.role &&
+                            `New role: ${ROLE_LABELS[r.request.role as keyof typeof ROLE_LABELS] ?? r.request.role}`,
                           r.comments,
                           r.decisionComments && `Decision: ${r.decisionComments}`,
                         ]

@@ -157,4 +157,51 @@ describeDb('Approval engine (HTTP + PostgreSQL)', () => {
     await ask(lead.session, { type: 'EMPLOYEE_DEACTIVATION', entityId: lead.id, reason: 'self' }).expect(422);
     await anonymous(app).get('/approvals').expect(401);
   });
+
+  it('reopening a project, reactivating a person and changing a role are carried out on approval', async () => {
+    // The project was closed by an earlier test; only a closed project can be reopened.
+    const reopen = await ask(lead.session, { type: 'PROJECT_REOPEN', entityId: projectId }).expect(201);
+    await as(app, manager)
+      .post(`/approvals/${reopen.body.id}/decision`, { decision: 'APPROVED' })
+      .expect(200);
+    const [p] = await db.sql<{ status: string }>(`SELECT status FROM projects WHERE id = $1`, [projectId]);
+    expect(p?.status).toBe('ACTIVE');
+    await ask(lead.session, { type: 'PROJECT_REOPEN', entityId: projectId }).expect(409);
+
+    // HR sees everyone in the organisation. The first test deactivated `coder`; asking to reactivate an active person is refused.
+    const hr = await createActiveEmployee(app, manager, {
+      employeeCode: 'AP-HR',
+      fullName: 'A HR',
+      email: 'aphr@example.test',
+      role: 'HR',
+    });
+    await ask(hr.session, { type: 'EMPLOYEE_REACTIVATION', entityId: coder2.id }).expect(409);
+    const react = await ask(hr.session, { type: 'EMPLOYEE_REACTIVATION', entityId: coder.id }).expect(201);
+    await as(app, manager).post(`/approvals/${react.body.id}/decision`, { decision: 'APPROVED' }).expect(200);
+    const [e] = await db.sql<{ status: string }>(`SELECT status FROM employees WHERE id = $1`, [coder.id]);
+    expect(e?.status).toBe('PENDING_ACTIVATION');
+
+    // Role change needs a role and a reason, and the same role is refused.
+    await ask(hr.session, { type: 'ROLE_CHANGE', entityId: coder2.id, reason: 'moving to audit' }).expect(
+      422,
+    );
+    await ask(hr.session, {
+      type: 'ROLE_CHANGE',
+      entityId: coder2.id,
+      role: 'CODER',
+      reason: 'same',
+    }).expect(422);
+    const change = await ask(hr.session, {
+      type: 'ROLE_CHANGE',
+      entityId: coder2.id,
+      role: 'AUDITOR',
+      reason: 'moving to audit',
+    }).expect(201);
+    expect(change.body.request.role).toBe('AUDITOR');
+    await as(app, manager)
+      .post(`/approvals/${change.body.id}/decision`, { decision: 'APPROVED' })
+      .expect(200);
+    const [r] = await db.sql<{ role: string }>(`SELECT role FROM employees WHERE id = $1`, [coder2.id]);
+    expect(r?.role).toBe('AUDITOR');
+  });
 });

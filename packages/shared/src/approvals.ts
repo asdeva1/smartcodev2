@@ -1,17 +1,28 @@
 import { z } from 'zod';
 import type { Page } from './employees.js';
 import { APPROVAL_STATUSES, type ApprovalStatus } from './statuses.js';
+import { ROLES } from './roles.js';
 import { loginNameSchema } from './validation.js';
 
 /** Approval engine: someone asks, the Manager decides, and the change is carried out on approval. */
 
-export const APPROVAL_TYPES = ['EMPLOYEE_DEACTIVATION', 'LOGIN_NAME_CHANGE', 'PROJECT_CLOSURE'] as const;
+export const APPROVAL_TYPES = [
+  'EMPLOYEE_DEACTIVATION',
+  'EMPLOYEE_REACTIVATION',
+  'ROLE_CHANGE',
+  'LOGIN_NAME_CHANGE',
+  'PROJECT_CLOSURE',
+  'PROJECT_REOPEN',
+] as const;
 export type ApprovalType = (typeof APPROVAL_TYPES)[number];
 
 export const APPROVAL_TYPE_LABELS: Readonly<Record<ApprovalType, string>> = {
   EMPLOYEE_DEACTIVATION: 'Deactivate employee',
+  EMPLOYEE_REACTIVATION: 'Reactivate employee',
+  ROLE_CHANGE: 'Change role',
   LOGIN_NAME_CHANGE: 'Change client login',
   PROJECT_CLOSURE: 'Close project',
+  PROJECT_REOPEN: 'Reopen project',
 };
 
 const comments = z
@@ -33,11 +44,17 @@ export const approvalCreateSchema = z
       .optional()
       .transform((v) => (v ? v : undefined)),
     loginName: loginNameSchema.optional(),
+    /** Role change: the role being asked for. */
+    role: z.enum(ROLES).optional(),
     comments,
   })
   .superRefine((v, ctx) => {
     if (v.type === 'EMPLOYEE_DEACTIVATION' && (v.reason?.length ?? 0) < 3) {
       ctx.addIssue({ code: 'custom', path: ['reason'], message: 'Give a reason' });
+    }
+    if (v.type === 'ROLE_CHANGE') {
+      if (!v.role) ctx.addIssue({ code: 'custom', path: ['role'], message: 'Choose the new role' });
+      if ((v.reason?.length ?? 0) < 3) ctx.addIssue({ code: 'custom', path: ['reason'], message: 'Give a reason' });
     }
     if (v.type === 'LOGIN_NAME_CHANGE' && !v.loginName) {
       ctx.addIssue({ code: 'custom', path: ['loginName'], message: 'Enter the new client login' });
@@ -77,7 +94,7 @@ export interface ApprovalRecord {
   entityId: string;
   requester: { id: string; fullName: string; role: string };
   /** What is being asked: the reason, or the new client login. */
-  request: { reason: string | null; loginName: string | null };
+  request: { reason: string | null; loginName: string | null; role: string | null };
   comments: string | null;
   decisionComments: string | null;
   resolvedBy: { id: string; fullName: string } | null;
