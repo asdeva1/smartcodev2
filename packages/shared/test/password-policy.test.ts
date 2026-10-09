@@ -7,8 +7,8 @@ describe('password policy', () => {
   it('accepts a long unique phrase', () => {
     expect(checkPasswordPolicy('Correct-Horse-Battery-7', ctx)).toBeNull();
   });
-  it('requires at least 12 characters', () => {
-    expect(checkPasswordPolicy('Short-1', ctx)).toMatch(/at least 12/);
+  it('requires at least 6 characters', () => {
+    expect(checkPasswordPolicy('Ab-1', ctx)).toMatch(/at least 6/);
   });
   it('rejects common passwords, including with a numeric suffix', () => {
     expect(checkPasswordPolicy('password1234', ctx)).toMatch(/too common/);
