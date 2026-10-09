@@ -33,7 +33,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permission: 'dashboard.vendor',
     group: 'Overview',
     available: true,
-    onlyRoles: ['VENDOR_ADMIN'],
+    onlyRoles: ['VENDOR_ADMIN', 'MANAGER'],
   },
   {
     key: 'team-dashboard',

@@ -1,4 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
+import { z } from 'zod';
 import { type ManagerDashboardQuery, managerDashboardQuerySchema } from '@smartcode/shared';
 import { CurrentPrincipal, RequirePermission } from '../../core/auth/decorators';
 import type { Principal } from '../../core/auth/principal';
@@ -7,6 +8,8 @@ import { ManagerDashboardService } from './manager-dashboard.service';
 import { CoachDashboardService } from './coach-dashboard.service';
 import { TeamLeadDashboardService } from './team-lead-dashboard.service';
 import { VendorDashboardService } from './vendor-dashboard.service';
+
+const vendorDashboardQuerySchema = z.object({ vendorId: z.string().uuid().optional() });
 
 @Controller('dashboards')
 export class DashboardsController {
@@ -27,11 +30,14 @@ export class DashboardsController {
     return this.manager.dashboard(p, q);
   }
 
-  /** The caller's own vendor: totals plus one row per coder. */
+  /** A Vendor Admin's own vendor (the query is ignored); a Manager chooses a vendor with ?vendorId=. */
   @Get('vendor')
   @RequirePermission('dashboard.vendor')
-  vendorDashboard(@CurrentPrincipal() p: Principal) {
-    return this.vendor.dashboard(p);
+  vendorDashboard(
+    @CurrentPrincipal() p: Principal,
+    @Query(new ZodValidationPipe(vendorDashboardQuerySchema)) q: { vendorId?: string },
+  ) {
+    return this.vendor.dashboard(p, q.vendorId);
   }
 
   /** The teams the caller leads: totals, pending audit/review/rework and a row per coder. */

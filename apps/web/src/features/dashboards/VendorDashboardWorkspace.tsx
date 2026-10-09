@@ -10,12 +10,15 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
-import type { VendorDashboard } from '@smartcode/shared';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
+import type { VendorDashboard, VendorRecord } from '@smartcode/shared';
 import { useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { EmptyState } from '@/components/EmptyState';
 import { env } from '@/env';
 import { RequireSession, useSession } from '@/features/auth/session';
+import { usePagedList } from '@/features/admin/ui';
 import { problemText } from '@/features/employees/common';
 import { apiFetch } from '@/lib/api';
 import { dash, FigureSections, num, Section } from './DashboardParts';
@@ -26,11 +29,17 @@ function Dashboard() {
   const { profile, signOut } = useSession();
   const [data, setData] = useState<VendorDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The Manager has full access and chooses which vendor to look at; a Vendor Admin always sees their own.
+  const isManager = profile.employee.role === 'MANAGER';
+  const vendors = usePagedList<VendorRecord>('/vendors', isManager ? { pageSize: 100 } : { pageSize: 1 });
+  const [chosen, setChosen] = useState('');
+  const vendorId = isManager ? chosen || vendors.data?.items[0]?.id || '' : '';
 
   useEffect(() => {
+    if (isManager && !vendorId) return;
     let cancelled = false;
     const load = () =>
-      apiFetch<VendorDashboard>('/dashboards/vendor')
+      apiFetch<VendorDashboard>(`/dashboards/vendor${vendorId ? `?vendorId=${vendorId}` : ''}`)
         .then((d) => {
           if (cancelled) return;
           setData(d);
@@ -45,11 +54,11 @@ function Dashboard() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, []);
+  }, [isManager, vendorId]);
 
   return (
     <AppShell
-      role="VENDOR_ADMIN"
+      role={profile.employee.role}
       title="Vendor dashboard"
       currentPath="/vendor"
       appEnv={env.NEXT_PUBLIC_APP_ENV}
@@ -57,6 +66,27 @@ function Dashboard() {
       onSignOut={() => void signOut()}
     >
       <Box sx={{ display: 'grid', gap: 3.5, maxWidth: 1200 }}>
+        {isManager && vendors.data && vendors.data.items.length > 0 && (
+          <TextField
+            select
+            label="Vendor"
+            value={vendorId}
+            onChange={(e) => {
+              setData(null);
+              setChosen(e.target.value);
+            }}
+            sx={{ maxWidth: 360 }}
+          >
+            {vendors.data.items.map((v) => (
+              <MenuItem key={v.id} value={v.id}>
+                {v.name}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
+        {isManager && vendors.data && vendors.data.items.length === 0 && (
+          <EmptyState title="No vendors yet" description="Add one under Vendors." />
+        )}
         {error && <Alert severity="error">{error}</Alert>}
         {data && (
           <>
@@ -110,10 +140,10 @@ function Dashboard() {
   );
 }
 
-/** Signed-in Vendor Admins only; the API limits every figure to their own vendor. */
+/** Vendor Admins (their own vendor) and the Manager (any vendor); the API enforces which. */
 export function VendorDashboardWorkspace() {
   return (
-    <RequireSession role="VENDOR_ADMIN">
+    <RequireSession permission="dashboard.vendor">
       <Dashboard />
     </RequireSession>
   );

@@ -166,8 +166,18 @@ describeDb('Phase 11 — Manager dashboard (HTTP + PostgreSQL)', () => {
     expect(JSON.stringify(res.body)).not.toContain('D D-C');
   });
 
-  it('the vendor dashboard is for the Vendor Admin only', async () => {
-    expect([403, 404]).toContain((await as(app, manager).get('/dashboards/vendor')).status);
+  it('the vendor dashboard is for the Vendor Admin and the Manager only', async () => {
+    // The Manager has full access but must choose a vendor; a Vendor Admin cannot pick another vendor.
+    await as(app, manager).get('/dashboards/vendor').expect(422);
+    const asManager = await as(app, manager).get(`/dashboards/vendor?vendorId=${vendorId}`).expect(200);
+    expect(asManager.body.vendor).toEqual({ id: vendorId, name: 'Dash Vendor' });
+    await as(app, manager)
+      .get('/dashboards/vendor?vendorId=00000000-0000-7000-8000-000000000000')
+      .expect(404);
+    const spoof = await as(app, vendorAdmin)
+      .get('/dashboards/vendor?vendorId=00000000-0000-7000-8000-000000000000')
+      .expect(200);
+    expect(spoof.body.vendor.id).toBe(vendorId);
     await as(app, coder.session).get('/dashboards/vendor').expect(403);
     await as(app, vendorAdmin).get('/dashboards/manager').expect(403);
     await anonymous(app).get('/dashboards/vendor').expect(401);
