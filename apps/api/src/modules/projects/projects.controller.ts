@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import {
+  type AssignChart,
   type ChartIdList,
   type ClientPullback,
   type CsvCommit,
@@ -12,6 +13,7 @@ import {
   type ProjectUpdate,
   type ReportQuery,
   type SubmitToClient,
+  assignChartSchema,
   chartIdListSchema,
   clientPullbackSchema,
   csvCommitSchema,
@@ -158,6 +160,41 @@ export class ProjectsController {
     @Meta() meta: RequestMeta,
   ) {
     return this.allocation.commit(p, id, body.csv, body.mode, meta);
+  }
+
+  @Post(':id/charts/import/preview')
+  @RequirePermission('chart.allocate')
+  @HttpCode(200)
+  previewRepository(
+    @CurrentPrincipal() p: Principal,
+    @Param('id', new UuidParamPipe()) id: string,
+    @Body(new ZodValidationPipe(csvUploadSchema)) body: CsvUpload,
+  ) {
+    return this.allocation.previewRepository(p, id, body.csv);
+  }
+
+  @Post(':id/charts/import/commit')
+  @RequirePermission('chart.allocate')
+  @HttpCode(200)
+  commitRepository(
+    @CurrentPrincipal() p: Principal,
+    @Param('id', new UuidParamPipe()) id: string,
+    @Body(new ZodValidationPipe(csvCommitSchema)) body: CsvCommit,
+    @Meta() meta: RequestMeta,
+  ) {
+    return this.allocation.commitRepository(p, id, body.csv, body.mode, meta);
+  }
+
+  @Post(':id/charts/assign')
+  @RequirePermission('chart.allocate')
+  @HttpCode(200)
+  assignChart(
+    @CurrentPrincipal() p: Principal,
+    @Param('id', new UuidParamPipe()) id: string,
+    @Body(new ZodValidationPipe(assignChartSchema)) body: AssignChart,
+    @Meta() meta: RequestMeta,
+  ) {
+    return this.allocation.assign(p, id, body, meta);
   }
 
   @Post(':id/charts/pull-back')

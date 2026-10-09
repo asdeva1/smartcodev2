@@ -542,5 +542,106 @@ other@vlms.com,coder.a@example.test,CH-2001,1,,`,
           .expect(403);
       });
     });
+
+    describe('Chart repository: upload stores charts, Add chart allots one', () => {
+      let repo: { id: string };
+      let coderC: { id: string; session: Session };
+      const upload = (csv: string, mode: 'valid-only' | 'all-or-nothing' = 'all-or-nothing') =>
+        as(app, manager).post(`/projects/${repo.id}/charts/import/commit`, { csv, mode });
+      const add = (body: object, session = manager) =>
+        as(app, session).post(`/projects/${repo.id}/charts/assign`, body);
+
+      beforeAll(async () => {
+        repo = (
+          await as(app, manager)
+            .post('/projects', {
+              clientName: 'Repo Client',
+              name: 'Repository flow',
+              allocationType: 'MANUAL',
+            })
+            .expect(201)
+        ).body;
+        coderC = await mk('CODER', 'p5-cr', 'coder.r@example.test', 'Coder R');
+      });
+
+      it('the CSV stores charts as PENDING_ALLOCATION with no coder; a Chart ID already in the project is refused', async () => {
+        const csv = 'Chart ID,Pages,Page Bucket,Remarks\nR-1,12,1-25,Priority\nR-2,,,\nR-3,5,,';
+        const pv = await as(app, manager)
+          .post(`/projects/${repo.id}/charts/import/preview`, { csv })
+          .expect(200);
+        expect(pv.body).toMatchObject({ total: 3, valid: 3, invalid: 0 });
+        const res = await upload(csv).expect(200);
+        expect(res.body).toMatchObject({ committed: true, created: 3 });
+        const detail = await as(app, manager).get(`/projects/${repo.id}`).expect(200);
+        expect(detail.body.chartsByStatus).toEqual({ PENDING_ALLOCATION: 3 });
+        const again = await upload('Chart ID\nR-1\nR-9').expect(200);
+        expect(again.body.committed).toBe(false);
+        expect(JSON.stringify(again.body.preview.rows)).toContain('already in the project');
+      });
+
+      it('Add chart links the Login Name to the email and the chart, adds the coder to the project and shows in My allotment', async () => {
+        const res = await add({
+          chartId: 'R-1',
+          loginName: 'coderc@vlms.com',
+          email: 'coder.r@example.test',
+        }).expect(200);
+        expect(res.body.committed).toBe(true);
+        const mine = await as(app, coderC.session).get('/allocation/mine').expect(200);
+        expect(mine.body.loginName).toBe('coderc@vlms.com');
+        expect(mine.body.charts).toHaveLength(1);
+        expect(mine.body.charts[0]).toMatchObject({
+          chartId: 'R-1',
+          pages: 12,
+          pageBucket: '1-25',
+          status: 'ALLOCATED',
+          project: { id: repo.id, name: 'Repository flow' },
+        });
+        const detail = await as(app, manager).get(`/projects/${repo.id}`).expect(200);
+        expect(detail.body.chartsByStatus).toEqual({ PENDING_ALLOCATION: 2, ALLOCATED: 1 });
+        const dash = await as(app, coderC.session).get('/production/dashboard').expect(200);
+        expect(dash.body.projects).toEqual([
+          expect.objectContaining({ id: repo.id, name: 'Repository flow' }),
+        ]);
+      });
+
+      it('refuses a Chart ID that was never uploaded (404), an allotted chart, an unknown email and a wrong Login Name', async () => {
+        await add({
+          chartId: 'NOT-UPLOADED',
+          loginName: 'coderc@vlms.com',
+          email: 'coder.r@example.test',
+        }).expect(404);
+        const again = await add({
+          chartId: 'R-1',
+          loginName: 'coderc@vlms.com',
+          email: 'coder.r@example.test',
+        }).expect(200);
+        expect(again.body.committed).toBe(false);
+        expect(JSON.stringify(again.body.preview.rows)).toContain('already allocated');
+        const unknown = await add({
+          chartId: 'R-2',
+          loginName: 'x@vlms.com',
+          email: 'nobody@example.test',
+        }).expect(200);
+        expect(unknown.body.committed).toBe(false);
+        expect(JSON.stringify(unknown.body.preview.rows)).toContain('No employee has this Email ID');
+        const wrong = await add({
+          chartId: 'R-2',
+          loginName: 'other@vlms.com',
+          email: 'coder.r@example.test',
+        }).expect(200);
+        expect(wrong.body.committed).toBe(false);
+        expect(JSON.stringify(wrong.body.preview.rows)).toContain('already works under Login Name');
+      });
+
+      it('only the Manager can upload or add charts (403)', async () => {
+        await as(app, lead.session)
+          .post(`/projects/${repo.id}/charts/import/commit`, { csv: 'Chart ID\nZ-1', mode: 'all-or-nothing' })
+          .expect(403);
+        await add(
+          { chartId: 'R-2', loginName: 'q@vlms.com', email: 'coder.r@example.test' },
+          coderC.session,
+        ).expect(403);
+      });
+    });
   },
 );

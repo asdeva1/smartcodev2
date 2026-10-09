@@ -20,7 +20,7 @@ import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import {
-  ALLOCATION_CSV_COLUMNS,
+  REPOSITORY_CSV_COLUMNS,
   type ProjectChartRecord,
   type ProjectDetail,
   type PullbackResult,
@@ -100,10 +100,10 @@ export function ProjectAllocation({
         sx={{ p: 2, display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}
       >
         <Button variant="contained" disabled={!active} onClick={() => setDialog('upload')}>
-          Upload allocation CSV
+          Upload CSV
         </Button>
         <Button variant="outlined" disabled={!active} onClick={() => setDialog('assign')}>
-          Assign chart
+          Add chart
         </Button>
         <Button
           variant="outlined"
@@ -119,7 +119,7 @@ export function ProjectAllocation({
       </Paper>
       {!active && (
         <Alert severity="info">
-          Only an active project can receive charts. Set the project to Active to upload.
+          Only an active project can receive charts. Set the project to Active to upload charts.
         </Alert>
       )}
       {project.clientPullbackAt && (
@@ -170,11 +170,11 @@ export function ProjectAllocation({
         ) : list.data && list.data.total === 0 ? (
           <EmptyState
             title={q || status ? 'No charts match' : 'No charts in this project yet'}
-            description="Upload the allocation CSV: Login Name, Email ID, Chart ID, Pages, Page Bucket, Remarks. Each chart is allotted to that coder, who sees it in the Coder portal."
+            description="Upload a CSV of charts (Chart ID, Pages, Page Bucket, Remarks) to store them here, then use Add chart to allot each one to a coder."
             action={
               !q && !status && active ? (
                 <Button variant="contained" onClick={() => setDialog('upload')}>
-                  Upload allocation CSV
+                  Upload CSV
                 </Button>
               ) : undefined
             }
@@ -286,17 +286,17 @@ export function ProjectAllocation({
 
       {dialog === 'upload' && (
         <CsvImportDialog
-          title="Upload allocation CSV"
-          columns={ALLOCATION_CSV_COLUMNS}
-          templateRow="naveen@vlms.com,naveen@smartcluestech.com,CH-10001,12,1-25,Priority"
-          guidance="Each row allots one chart to the coder with that Email ID under that Login Name. Pages, Page Bucket and Remarks are optional. If the coder has no Login Name yet it is assigned from the file, and the coder is added to this project. Delete the example row from the template before you upload. A chart that is already allotted must be pulled back first."
-          previewPath={`/projects/${project.id}/allocation/preview`}
-          commitPath={`/projects/${project.id}/allocation/commit`}
-          doneVerb="allotted"
+          title="Upload chart CSV"
+          columns={REPOSITORY_CSV_COLUMNS}
+          templateRow="CH-10001,12,1-25,Priority"
+          guidance="Each row stores one chart in this project’s chart list, waiting to be allotted. Pages, Page Bucket and Remarks are optional. Delete the example row from the template before you upload. Use Add chart to allot a stored chart to a coder."
+          previewPath={`/projects/${project.id}/charts/import/preview`}
+          commitPath={`/projects/${project.id}/charts/import/commit`}
+          doneVerb="stored"
           onClose={(changed) => {
             setDialog(null);
             if (changed) {
-              onToast('Charts allotted. Coders can see them in their portal.');
+              onToast('Charts stored. Use Add chart to allot them to a coder.');
               refreshAll();
             }
           }}
