@@ -165,11 +165,11 @@ function Reviews() {
                   {queue.items.map((r) => (
                     <TableRow key={r.auditId} hover>
                       <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{r.chartId}</TableCell>
-                      <TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
                         {r.project.client} · {r.project.name}
                       </TableCell>
-                      <TableCell>{r.coder}</TableCell>
-                      <TableCell>{r.auditor}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{r.coder}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{r.auditor}</TableCell>
                       <TableCell align="right">{r.auditErrors}</TableCell>
                       <TableCell align="right">{r.errorExceptions}</TableCell>
                       <TableCell align="right">{r.totalErrors}</TableCell>

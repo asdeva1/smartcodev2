@@ -13,6 +13,7 @@ import { AppShell } from '@/components/AppShell';
 import { env } from '@/env';
 import { RequireSession, useSession } from '@/features/auth/session';
 import { problemText } from '@/features/employees/common';
+import { ReadOnlyField } from './shared';
 import { apiFetch } from '@/lib/api';
 
 function Workspace({ chartRef }: { chartRef: string }) {
@@ -124,12 +125,8 @@ function Workspace({ chartRef }: { chartRef: string }) {
               </Alert>
             )}
             <Box sx={{ display: 'grid', gap: 2 }}>
-              <TextField label="Chart ID" value={chart.chartId} slotProps={{ input: { readOnly: true } }} />
-              <TextField
-                label="Page numbers"
-                value={chart.pages ?? ''}
-                slotProps={{ input: { readOnly: true } }}
-              />
+              <ReadOnlyField label="Chart ID" value={chart.chartId} />
+              <ReadOnlyField label="Page numbers" value={chart.pages ?? ''} />
               <TextField
                 label="ICDs"
                 value={icds}

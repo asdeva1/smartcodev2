@@ -19,14 +19,10 @@ import { AppShell } from '@/components/AppShell';
 import { env } from '@/env';
 import { RequireSession, useSession } from '@/features/auth/session';
 import { problemText } from '@/features/employees/common';
-import { useResource } from '@/features/projects/shared';
+import { ReadOnlyField, useResource } from '@/features/projects/shared';
 import { apiFetch } from '@/lib/api';
 
 const RANGE = 'Enter a whole number from 0 to 9999.';
-
-function ReadOnly({ label, value }: { label: string; value: string | number }) {
-  return <TextField label={label} value={String(value)} slotProps={{ input: { readOnly: true } }} />;
-}
 
 function Form({ item }: { item: AuditQueueItem }) {
   const router = useRouter();
@@ -104,12 +100,12 @@ function Form({ item }: { item: AuditQueueItem }) {
         {item.isReAudit ? ' · Re-audit of the corrected version' : ''}
       </Typography>
       <Box sx={{ display: 'grid', gap: 2 }}>
-        <ReadOnly label="Chart ID" value={item.chartId} />
-        <ReadOnly label="Coder" value={`${item.coder} (${item.loginName})`} />
+        <ReadOnlyField label="Chart ID" value={item.chartId} />
+        <ReadOnlyField label="Coder" value={`${item.coder} (${item.loginName})`} />
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(3, 1fr)' }}>
-          <ReadOnly label="Page numbers" value={item.pages ?? '—'} />
-          <ReadOnly label="ICDs" value={item.icds} />
-          <ReadOnly label="DOS" value={item.dos} />
+          <ReadOnlyField label="Page numbers" value={item.pages ?? '—'} />
+          <ReadOnlyField label="ICDs" value={item.icds} />
+          <ReadOnlyField label="DOS" value={item.dos} />
         </Box>
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(3, 1fr)' }}>
           <TextField
@@ -129,11 +125,10 @@ function Form({ item }: { item: AuditQueueItem }) {
             helperText={fieldErrors.errorExceptions}
             slotProps={{ htmlInput: { inputMode: 'numeric' } }}
           />
-          <TextField
+          <ReadOnlyField
             label="Total Errors"
-            value={total === null || Number.isNaN(total) ? '' : String(total)}
+            value={total === null || Number.isNaN(total) ? '' : total}
             helperText="Audit Errors + Error Exceptions"
-            slotProps={{ input: { readOnly: true } }}
           />
         </Box>
         <TextField

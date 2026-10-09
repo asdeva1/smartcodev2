@@ -27,7 +27,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { env } from '@/env';
 import { RequireSession, useSession } from '@/features/auth/session';
 import { problemText } from '@/features/employees/common';
-import { formatDateTime, useResource } from '@/features/projects/shared';
+import { formatDateTime, ReadOnlyField, useResource } from '@/features/projects/shared';
 import { apiFetch } from '@/lib/api';
 
 const RANGE = 'Enter a whole number from 0 to 9999.';
@@ -174,8 +174,8 @@ function Form({ item }: { item: ReworkItem }) {
         {item.reason}
       </Alert>
       <Box sx={{ display: 'grid', gap: 2 }}>
-        <TextField label="Chart ID" value={item.chartId} slotProps={{ input: { readOnly: true } }} />
-        <TextField label="Page numbers" value={item.pages ?? ''} slotProps={{ input: { readOnly: true } }} />
+        <ReadOnlyField label="Chart ID" value={item.chartId} />
+        <ReadOnlyField label="Page numbers" value={item.pages ?? ''} />
         <Typography variant="body2" color="text.secondary">
           Your earlier submission: {item.previousIcds} ICDs, {item.previousDos} DOS. Enter the corrected
           figures.

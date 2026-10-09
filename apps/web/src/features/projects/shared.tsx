@@ -1,6 +1,7 @@
 'use client';
 
 import Chip from '@mui/material/Chip';
+import TextField from '@mui/material/TextField';
 import { type AllocationType, type ProjectStatus } from '@smartcode/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
@@ -74,4 +75,25 @@ const PROJECT_STATUS: Record<ProjectStatus, { label: string; color: 'success' | 
 export function ProjectStatusChip({ status }: { status: ProjectStatus }) {
   const { label, color } = PROJECT_STATUS[status];
   return <Chip size="small" variant="outlined" label={label} color={color} />;
+}
+
+/** A value the person can see but not change: greyed, labelled, and announced as read-only. */
+export function ReadOnlyField({
+  label,
+  value,
+  helperText,
+}: {
+  label: string;
+  value: string | number;
+  helperText?: string;
+}) {
+  return (
+    <TextField
+      label={label}
+      value={String(value)}
+      helperText={helperText}
+      slotProps={{ input: { readOnly: true }, inputLabel: { shrink: true } }}
+      sx={{ '& .MuiInputBase-root': { bgcolor: 'action.hover' } }}
+    />
+  );
 }
