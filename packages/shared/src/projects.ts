@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  ACTIVE_STATUSES,
+  type ACTIVE_STATUSES,
   ALLOCATION_TYPES,
   PROJECT_STATUSES,
   type AllocationType,

@@ -35,7 +35,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build API image
-        run: docker build -f apps/api/Dockerfile --target runtime -t smartcode-api:scan .
+        shell: bash
+        run: |
+          set -o pipefail
+          if ! docker build --progress=plain -f apps/api/Dockerfile --target runtime -t smartcode-api:scan . 2>&1 | tee build.log; then
+            # Surface the end of the log as annotations so a failure is readable without downloading the full log.
+            tail -n 25 build.log | while IFS= read -r line; do echo "::error::${line}"; done
+            exit 1
+          fi
       - name: Scan image (fixable HIGH/CRITICAL findings fail the build)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0 (pinned to the commit; the project retagged after a supply-chain incident)
         with:
