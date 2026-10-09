@@ -153,7 +153,7 @@ describe('RequireSession', () => {
     expect(homeFor('MANAGER')).toBe('/manager');
     expect(homeFor('CODER')).toBe('/coder');
     expect(homeFor('TEAM_LEAD')).toBe('/projects');
-    expect(homeFor('VENDOR_ADMIN')).toBe('/manager/employees');
+    expect(homeFor('VENDOR_ADMIN')).toBe('/vendor');
   });
 });
 

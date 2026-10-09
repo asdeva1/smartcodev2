@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { VendorDashboardWorkspace } from '@/features/dashboards/VendorDashboardWorkspace';
 import { ManagerDashboardWorkspace } from '@/features/dashboards/ManagerDashboardWorkspace';
 import { renderWithTheme } from './render';
 
@@ -101,5 +102,46 @@ describe('Manager dashboard', () => {
     await user.click(screen.getByRole('combobox', { name: 'Show' }));
     await user.click(await screen.findByRole('option', { name: 'Balaji Vendor' }));
     await waitFor(() => expect(calls.some((c) => c.includes('/dashboards/manager?vendorId=v1'))).toBe(true));
+  });
+});
+
+describe('Vendor dashboard', () => {
+  it('shows the vendor’s own figures and a row per coder', async () => {
+    const vendorProfile = {
+      employee: { ...profile.employee, role: 'VENDOR_ADMIN', vendorId: 'v1', fullName: 'Vera Admin' },
+      permissions: { 'dashboard.vendor': 'VENDOR', 'employee.read': 'VENDOR' },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const path = url.replace(/^https?:\/\/[^/]+\/api\/v1/, '');
+        if (path === '/auth/me') return json(vendorProfile);
+        if (path === '/notifications') return json({ unread: 0, items: [] });
+        return json({
+          ...dashboard({ vendorId: 'v1', name: 'Balaji Vendor' }),
+          vendor: { id: 'v1', name: 'Balaji Vendor' },
+          coders: [
+            {
+              coderId: 'c1',
+              fullName: 'Naveen P',
+              loginName: 'naveen@vlms.com',
+              chartsToday: 3,
+              chartsMonth: 40,
+              pagesMonth: 800,
+              cph: 6.5,
+              auditPercentage: null,
+              openCharts: 12,
+            },
+          ],
+        });
+      }),
+    );
+    renderWithTheme(<VendorDashboardWorkspace />);
+    const table = await screen.findByRole('table', { name: 'Coder performance' });
+    expect(within(table).getByText('Naveen P')).toBeInTheDocument();
+    expect(within(table).getByText('naveen@vlms.com')).toBeInTheDocument();
+    expect(within(table).getByText('6.5')).toBeInTheDocument();
+    expect(screen.getByText('Active projects')).toBeInTheDocument();
+    expect(screen.getByText(/Balaji Vendor\./)).toBeInTheDocument();
   });
 });

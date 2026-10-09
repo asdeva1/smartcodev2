@@ -65,3 +65,22 @@ export interface ManagerDashboard {
   };
   vendors: VendorPerformanceRow[];
 }
+
+export interface CoderPerformanceRow {
+  coderId: string;
+  fullName: string;
+  loginName: string | null;
+  chartsToday: number;
+  chartsMonth: number;
+  pagesMonth: number;
+  cph: number | null;
+  auditPercentage: number | null;
+  /** Charts currently with the coder (allocated or in production). */
+  openCharts: number;
+}
+
+/** The Vendor Admin's own vendor: the same figures as the Manager dashboard, limited to that vendor, plus each coder. */
+export interface VendorDashboard extends ManagerDashboard {
+  vendor: { id: string; name: string };
+  coders: CoderPerformanceRow[];
+}

@@ -14,6 +14,7 @@ describeDb('Phase 11 — Manager dashboard (HTTP + PostgreSQL)', () => {
   let vendorAdmin: Session;
   let coder: { id: string; session: Session };
   let auditor: { id: string; session: Session };
+  let vendorCoder: { id: string; session: Session };
   const ids: Record<string, string> = {};
 
   const dash = (qs = '', who = manager) => as(app, who).get(`/dashboards/manager${qs}`);
@@ -52,7 +53,7 @@ describeDb('Phase 11 — Manager dashboard (HTTP + PostgreSQL)', () => {
         vendorId,
       })
     ).session;
-    await mk('CODER', 'D-VC', 'dvc@example.test', { vendorId });
+    vendorCoder = await mk('CODER', 'D-VC', 'dvc@example.test', { vendorId });
 
     const inHouse = await as(app, manager)
       .post('/projects', { clientName: 'Acme', name: 'In-house work', allocationType: 'MANUAL' })
@@ -141,6 +142,35 @@ describeDb('Phase 11 — Manager dashboard (HTTP + PostgreSQL)', () => {
 
     await dash('?vendorId=00000000-0000-7000-8000-000000000000').expect(404);
     await dash('?vendorId=nope').expect(422);
+  });
+
+  it('Vendor Admin sees only their own vendor, with a row per coder', async () => {
+    await as(app, vendorCoder.session)
+      .post(`/production/charts/${ids['V-1']}/submit`, { icds: 4, dos: 1 })
+      .expect(200);
+    const res = await as(app, vendorAdmin).get('/dashboards/vendor').expect(200);
+    expect(res.body.vendor).toEqual({ id: vendorId, name: 'Dash Vendor' });
+    expect(res.body.charts.total).toBe(2);
+    expect(res.body.production.month).toMatchObject({ charts: 1, pages: 20, icds: 4, dos: 1 });
+    expect(res.body.vendors.map((v: { name: string }) => v.name)).toEqual(['Dash Vendor']);
+    expect(res.body.coders).toHaveLength(1);
+    expect(res.body.coders[0]).toMatchObject({
+      fullName: 'D D-VC',
+      loginName: 'dvc@vlms.com',
+      chartsToday: 1,
+      chartsMonth: 1,
+      pagesMonth: 20,
+      openCharts: 1,
+    });
+    // No in-house coder or in-house work leaks in.
+    expect(JSON.stringify(res.body)).not.toContain('D D-C');
+  });
+
+  it('the vendor dashboard is for the Vendor Admin only', async () => {
+    expect([403, 404]).toContain((await as(app, manager).get('/dashboards/vendor')).status);
+    await as(app, coder.session).get('/dashboards/vendor').expect(403);
+    await as(app, vendorAdmin).get('/dashboards/manager').expect(403);
+    await anonymous(app).get('/dashboards/vendor').expect(401);
   });
 
   it('is Manager-only (403 for every other role, 401 without a session)', async () => {

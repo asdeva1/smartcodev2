@@ -11,11 +11,11 @@ import { ProblemException } from '../../core/errors/problem';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { dayKey, monthStart, zonedDayStart } from '../projects/zoned-time';
 
-const round1 = (n: number) => Math.round(n * 10) / 10;
+export const round1 = (n: number) => Math.round(n * 10) / 10;
 const NOT_FOUND = () => new ProblemException(404, 'NOT_FOUND', 'Vendor not found');
 
 /** Error-based accuracy: (ICDs + DOS − errors) ÷ (ICDs + DOS) × 100; null when nothing was audited. */
-function accuracy(audits: { totalErrors: number; units: number }[]): number | null {
+export function accuracy(audits: { totalErrors: number; units: number }[]): number | null {
   if (audits.length === 0) return null;
   const units = audits.reduce((n, a) => n + a.units, 0);
   const errors = audits.reduce((n, a) => n + a.totalErrors, 0);

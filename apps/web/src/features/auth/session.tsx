@@ -52,7 +52,7 @@ export function homeFor(role: Role): string {
     case 'GROUP_COACH':
       return '/projects';
     case 'VENDOR_ADMIN':
-      return '/manager/employees';
+      return '/vendor';
     case 'HR':
       return '/manager/employees';
     default:
