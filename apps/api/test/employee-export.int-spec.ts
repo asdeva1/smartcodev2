@@ -43,7 +43,7 @@ describeDb('Employee directory export and timeline (HTTP + PostgreSQL)', () => {
     expect(all.headers['content-disposition']).toMatch(
       /attachment; filename="employees_\d{4}-\d{2}-\d{2}\.csv"/,
     );
-    const text = all.text.replace(/^﻿/, '');
+    const text = all.text.replace(/^\uFEFF/, '');
     const lines = text.trim().split('\r\n');
     expect(lines[0]).toBe(
       'Employee ID,Name,Email,Role,Team,Team Lead,Projects,Vendor,Status,Login Name,Created,Activated',

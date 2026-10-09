@@ -40,7 +40,7 @@ jobs:
           set -o pipefail
           if ! docker build --progress=plain -f apps/api/Dockerfile --target runtime -t smartcode-api:scan . 2>&1 | tee build.log; then
             # Surface the end of the log as annotations so a failure is readable without downloading the full log.
-            tail -n 25 build.log | while IFS= read -r line; do echo "::error::${line}"; done
+            grep -iE 'error|failed|cannot|not found|denied' build.log | tail -n 20 | while IFS= read -r line; do echo "::error::${line}"; done
             exit 1
           fi
       - name: Scan image (fixable HIGH/CRITICAL findings fail the build)
