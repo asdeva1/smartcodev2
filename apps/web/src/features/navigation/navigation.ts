@@ -33,6 +33,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permission: 'dashboard.vendor',
     group: 'Overview',
     available: true,
+    onlyRoles: ['VENDOR_ADMIN'],
   },
   {
     key: 'team-dashboard',
@@ -41,6 +42,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permission: 'dashboard.teamLead',
     group: 'Overview',
     available: true,
+    onlyRoles: ['TEAM_LEAD'],
   },
   {
     key: 'coach-dashboard',
@@ -49,6 +51,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permission: 'dashboard.groupCoach',
     group: 'Overview',
     available: true,
+    onlyRoles: ['GROUP_COACH'],
   },
   {
     key: 'coder-home',
