@@ -190,7 +190,7 @@ describeDb('Coder workspace: open a chart, enter ICDs and DOS, submit (HTTP + Po
     expect(xl.headers['content-type']).toContain('spreadsheetml.sheet');
     const { default: ExcelJS } = await import('exceljs');
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(xl.body as Buffer);
+    await wb.xlsx.load(xl.body as never);
     expect(wb.worksheets[0]?.name).toBe('Quality report');
 
     await as(app, manager).get(`${base}/nonsense/export`).expect(404);
