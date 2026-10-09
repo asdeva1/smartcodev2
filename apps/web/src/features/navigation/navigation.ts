@@ -32,7 +32,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/vendor',
     permission: 'dashboard.vendor',
     group: 'Overview',
-    available: false,
+    available: true,
   },
   {
     key: 'team-dashboard',
@@ -40,7 +40,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/team-lead',
     permission: 'dashboard.teamLead',
     group: 'Overview',
-    available: false,
+    available: true,
   },
   {
     key: 'coach-dashboard',
@@ -48,7 +48,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/sme',
     permission: 'dashboard.groupCoach',
     group: 'Overview',
-    available: false,
+    available: true,
   },
   {
     key: 'coder-home',

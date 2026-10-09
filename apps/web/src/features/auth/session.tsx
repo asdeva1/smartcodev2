@@ -49,8 +49,9 @@ export function homeFor(role: Role): string {
     case 'AUDITOR':
       return '/auditor';
     case 'TEAM_LEAD':
+      return '/team-lead';
     case 'GROUP_COACH':
-      return '/projects';
+      return '/sme';
     case 'VENDOR_ADMIN':
       return '/vendor';
     case 'HR':

@@ -173,6 +173,76 @@ describeDb('Phase 11 — Manager dashboard (HTTP + PostgreSQL)', () => {
     await anonymous(app).get('/dashboards/vendor').expect(401);
   });
 
+  it('Team Lead sees only their own team’s coders, pending audit and quality', async () => {
+    const lead = await createActiveEmployee(app, manager, {
+      employeeCode: 'D-TL',
+      fullName: 'Dash Lead',
+      email: 'dtl@example.test',
+      role: 'TEAM_LEAD',
+    });
+    const otherLead = await createActiveEmployee(app, manager, {
+      employeeCode: 'D-TL2',
+      fullName: 'Other Lead',
+      email: 'dtl2@example.test',
+      role: 'TEAM_LEAD',
+    });
+    const team = (await as(app, manager).post('/teams', { name: 'Dash Team' }).expect(201)).body;
+    await as(app, manager).patch(`/teams/${team.id}`, { teamLeadId: lead.id }).expect(200);
+    await as(app, manager).post(`/teams/${team.id}/members`, { employeeId: coder.id }).expect(200);
+
+    const res = await as(app, lead.session).get('/dashboards/team-lead').expect(200);
+    expect(res.body.teams).toEqual([{ id: team.id, name: 'Dash Team' }]);
+    expect(res.body.coders.map((c: { fullName: string }) => c.fullName)).toEqual(['D D-C']);
+    expect(res.body.coders[0]).toMatchObject({
+      chartsToday: 2,
+      chartsMonth: 2,
+      pagesMonth: 42,
+      openCharts: 1,
+    });
+    expect(res.body.totals).toMatchObject({ coders: 1, chartsMonth: 2, auditedCharts: 1, totalErrors: 2 });
+    expect(res.body.totals.auditPercentage).toBe(75);
+    expect(res.body.pending.audit).toBe(1);
+    // The vendor's coder is not on this team.
+    expect(JSON.stringify(res.body)).not.toContain('D D-VC');
+
+    const none = await as(app, otherLead.session).get('/dashboards/team-lead').expect(200);
+    expect(none.body.teams).toEqual([]);
+    expect(none.body.coders).toEqual([]);
+    await as(app, coder.session).get('/dashboards/team-lead').expect(403);
+    await as(app, vendorAdmin).get('/dashboards/team-lead').expect(403);
+  });
+
+  it('Quality Coach sees audit quality only for projects they are staffed on', async () => {
+    const coach = await createActiveEmployee(app, manager, {
+      employeeCode: 'D-GC',
+      fullName: 'Dash Coach',
+      email: 'dgc@example.test',
+      role: 'GROUP_COACH',
+    });
+    const projects = await as(app, manager).get('/projects').expect(200);
+    const inHouse = projects.body.items.find((p: { name: string }) => p.name === 'In-house work');
+    await as(app, manager)
+      .post(`/projects/${inHouse.id}/members`, { employeeId: coach.id, projectRole: 'GROUP_COACH' })
+      .expect(200);
+
+    const res = await as(app, coach.session).get('/dashboards/coach').expect(200);
+    expect(res.body.totals).toMatchObject({ projects: 1, auditedCharts: 1, totalErrors: 2 });
+    expect(res.body.totals.auditPercentage).toBe(75);
+    expect(res.body.projects).toHaveLength(1);
+    expect(res.body.projects[0]).toMatchObject({ name: 'In-house work', client: 'Acme', auditedCharts: 1 });
+    expect(res.body.coders[0]).toMatchObject({
+      fullName: 'D D-C',
+      auditErrors: 1,
+      errorExceptions: 1,
+      totalErrors: 2,
+    });
+    expect(JSON.stringify(res.body)).not.toContain('Vendor work');
+
+    await as(app, coder.session).get('/dashboards/coach').expect(403);
+    await as(app, vendorAdmin).get('/dashboards/coach').expect(403);
+    await anonymous(app).get('/dashboards/coach').expect(401);
+  });
+
   it('is Manager-only (403 for every other role, 401 without a session)', async () => {
     await dash('', coder.session).expect(403);
     await dash('', auditor.session).expect(403);

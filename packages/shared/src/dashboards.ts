@@ -84,3 +84,64 @@ export interface VendorDashboard extends ManagerDashboard {
   vendor: { id: string; name: string };
   coders: CoderPerformanceRow[];
 }
+
+/** A Team Lead's own team(s): totals and a row per coder. */
+export interface TeamLeadDashboard {
+  asOf: string;
+  timeZone: string;
+  monthFrom: string;
+  teams: { id: string; name: string }[];
+  totals: {
+    coders: number;
+    openCharts: number;
+    chartsToday: number;
+    chartsMonth: number;
+    pagesMonth: number;
+    cph: number | null;
+    auditPercentage: number | null;
+    auditedCharts: number;
+    totalErrors: number;
+  };
+  pending: { audit: number; reviewRequired: number; rework: number };
+  coders: CoderPerformanceRow[];
+}
+
+export interface CoachProjectRow {
+  projectId: string;
+  name: string;
+  client: string;
+  auditedCharts: number;
+  auditPercentage: number | null;
+  totalErrors: number;
+  reviewRequired: number;
+  openRework: number;
+}
+
+export interface CoachCoderRow {
+  coderId: string;
+  fullName: string;
+  loginName: string | null;
+  auditedCharts: number;
+  auditPercentage: number | null;
+  auditErrors: number;
+  errorExceptions: number;
+  totalErrors: number;
+}
+
+/** The Quality Coach (SME) view: audit quality across the projects the coach is staffed on. */
+export interface CoachDashboard {
+  asOf: string;
+  timeZone: string;
+  monthFrom: string;
+  totals: {
+    projects: number;
+    auditedCharts: number;
+    auditPercentage: number | null;
+    totalErrors: number;
+    reviewRequired: number;
+    openRework: number;
+  };
+  projects: CoachProjectRow[];
+  /** Lowest accuracy first, so the coder who needs coaching most is at the top. */
+  coders: CoachCoderRow[];
+}

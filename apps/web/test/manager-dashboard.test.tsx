@@ -1,6 +1,8 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { CoachWorkspace } from '@/features/dashboards/CoachWorkspace';
+import { TeamLeadWorkspace } from '@/features/dashboards/TeamLeadWorkspace';
 import { VendorDashboardWorkspace } from '@/features/dashboards/VendorDashboardWorkspace';
 import { ManagerDashboardWorkspace } from '@/features/dashboards/ManagerDashboardWorkspace';
 import { renderWithTheme } from './render';
@@ -143,5 +145,123 @@ describe('Vendor dashboard', () => {
     expect(within(table).getByText('6.5')).toBeInTheDocument();
     expect(screen.getByText('Active projects')).toBeInTheDocument();
     expect(screen.getByText(/Balaji Vendor\./)).toBeInTheDocument();
+  });
+});
+
+const roleMock = (role: string, permission: string, body: unknown) =>
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) => {
+      const path = url.replace(/^https?:\/\/[^/]+\/api\/v1/, '');
+      if (path === '/auth/me')
+        return json({
+          employee: { ...profile.employee, role, fullName: 'Sam Person' },
+          permissions: { [permission]: 'TEAM' },
+        });
+      if (path === '/notifications') return json({ unread: 0, items: [] });
+      return json(body);
+    }),
+  );
+
+describe('Team Lead workspace', () => {
+  it('shows team figures, what is waiting and a row per coder', async () => {
+    roleMock('TEAM_LEAD', 'dashboard.teamLead', {
+      asOf: '2026-10-09T10:00:00.000Z',
+      timeZone: 'Asia/Kolkata',
+      monthFrom: '2026-10-01',
+      teams: [{ id: 't1', name: 'Alpha' }],
+      totals: {
+        coders: 2,
+        openCharts: 9,
+        chartsToday: 4,
+        chartsMonth: 50,
+        pagesMonth: 900,
+        cph: 6.2,
+        auditPercentage: 96.5,
+        auditedCharts: 20,
+        totalErrors: 3,
+      },
+      pending: { audit: 5, reviewRequired: 1, rework: 2 },
+      coders: [
+        {
+          coderId: 'c1',
+          fullName: 'Naveen P',
+          loginName: 'naveen@vlms.com',
+          chartsToday: 4,
+          chartsMonth: 50,
+          pagesMonth: 900,
+          cph: 6.2,
+          auditPercentage: 96.5,
+          openCharts: 9,
+        },
+      ],
+    });
+    renderWithTheme(<TeamLeadWorkspace />);
+    const table = await screen.findByRole('table', { name: 'Team coders' });
+    expect(within(table).getByText('Naveen P')).toBeInTheDocument();
+    expect(screen.getByText('Pending audit')).toBeInTheDocument();
+    expect(screen.getAllByText('96.5%').length).toBeGreaterThan(1);
+  });
+
+  it('says so when the Team Lead leads no team', async () => {
+    roleMock('TEAM_LEAD', 'dashboard.teamLead', {
+      asOf: '2026-10-09T10:00:00.000Z',
+      timeZone: 'Asia/Kolkata',
+      monthFrom: '2026-10-01',
+      teams: [],
+      totals: {},
+      pending: {},
+      coders: [],
+    });
+    renderWithTheme(<TeamLeadWorkspace />);
+    expect(await screen.findByText('You do not lead a team yet')).toBeInTheDocument();
+  });
+});
+
+describe('Quality coaching', () => {
+  it('lists projects and the coders with the lowest accuracy first', async () => {
+    roleMock('GROUP_COACH', 'dashboard.groupCoach', {
+      asOf: '2026-10-09T10:00:00.000Z',
+      timeZone: 'Asia/Kolkata',
+      monthFrom: '2026-10-01',
+      totals: {
+        projects: 1,
+        auditedCharts: 10,
+        auditPercentage: 92.5,
+        totalErrors: 8,
+        reviewRequired: 2,
+        openRework: 1,
+      },
+      projects: [
+        {
+          projectId: 'p1',
+          name: 'Cardiology Q4',
+          client: 'Acme Health',
+          auditedCharts: 10,
+          auditPercentage: 92.5,
+          totalErrors: 8,
+          reviewRequired: 2,
+          openRework: 1,
+        },
+      ],
+      coders: [
+        {
+          coderId: 'c1',
+          fullName: 'Naveen P',
+          loginName: 'naveen@vlms.com',
+          auditedCharts: 10,
+          auditPercentage: 92.5,
+          auditErrors: 5,
+          errorExceptions: 3,
+          totalErrors: 8,
+        },
+      ],
+    });
+    renderWithTheme(<CoachWorkspace />);
+    const projects = await screen.findByRole('table', { name: 'Project quality' });
+    expect(within(projects).getByText('Cardiology Q4')).toBeInTheDocument();
+    const coders = screen.getByRole('table', { name: 'Coder quality' });
+    expect(within(coders).getByText('Naveen P')).toBeInTheDocument();
+    expect(within(coders).getByText('Error exceptions', { selector: 'th' })).toBeInTheDocument();
   });
 });
