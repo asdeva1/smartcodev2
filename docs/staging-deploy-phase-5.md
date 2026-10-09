@@ -1,6 +1,6 @@
 # Staging deployment — Phases 4 + 5 (release/staging-phase-5)
 
-Status: **prepared, not deployed.** Nothing here has been run against AWS or Vercel.
+Status: **deployed to staging on 2026-10-09** (API image phase5-85757fc, migration 20261010000000 applied, web on Vercel). The cdk deploy MUST include the staging flags: `-c webUrl=https://smartcode-v2-web-staging.vercel.app -c appUrl=https://smartcode-v2-web-staging.vercel.app -c mailFrom=ashok.p@smartcluestech.com -c backupRetentionDays=1 -c httpsApiGateway=true` (without them CDK would replace the real URLs, drop MAIL_FROM and remove the API Gateway front door). Migration task: register a new revision of the migrate task definition with the new `-migrator` image (or run cdk deploy first only for additive migrations).
 
 ## What is in this release
 - Phase 4: Organization settings, Vendors, Teams, Chart Allocation (Login Names by email, CSV, Chart ID search).
