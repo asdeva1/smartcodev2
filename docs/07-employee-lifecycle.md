@@ -41,5 +41,5 @@ stateDiagram-v2
 ## Directory additions (Phase 12 branch)
 
 - **Export CSV** (`GET /employees/export`): same filters, scope and sort as the list, up to 10,000 rows; columns follow module 3 (Employee ID, Name, Email, Role, Team, Team Lead, Projects, Vendor, Status, Login Name, Created, Activated). Cells that start with `= + - @` are neutralised.
-- **Login Name column** in the directory table and the employee detail.
+- The directory table keeps no Login Name column on purpose (Login Names are managed in Chart Allocation); the export does include it.
 - **History** (`GET /employees/:id/timeline`): the person's audit-trail entries, newest first (rule 9). Visible to whoever may read that employee; others get 404.

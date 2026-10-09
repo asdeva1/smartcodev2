@@ -332,7 +332,6 @@ export function EmployeeDetailDialog({
     ['Team', employee.team?.name ?? '—'],
     ['Team Lead', employee.teamLead?.fullName ?? '—'],
     ['Projects', employee.projects.length ? employee.projects.map((p) => p.name).join(', ') : '—'],
-    ['Login Name', employee.loginName ?? '—'],
     ['Created', formatDate(employee.createdAt)],
     ['Activated', formatDate(employee.activatedAt)],
   ];

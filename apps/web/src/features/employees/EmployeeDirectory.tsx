@@ -354,7 +354,6 @@ export function EmployeeDirectory() {
                   <TableCell>Team Lead</TableCell>
                   <TableCell>Project</TableCell>
                   <TableCell>Vendor</TableCell>
-                  <TableCell>Login Name</TableCell>
                   <TableCell>{head('status', 'Status')}</TableCell>
                   <TableCell>{head('createdAt', 'Created')}</TableCell>
                   <TableCell>{head('activatedAt', 'Activated')}</TableCell>
@@ -383,7 +382,6 @@ export function EmployeeDirectory() {
                       {e.projects.length ? e.projects.map((p) => p.name).join(', ') : '—'}
                     </TableCell>
                     <TableCell>{e.vendor?.name ?? 'In-house'}</TableCell>
-                    <TableCell>{e.loginName ?? '—'}</TableCell>
                     <TableCell>
                       <EmployeeStatusChip status={e.status} />
                     </TableCell>
