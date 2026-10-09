@@ -295,6 +295,8 @@ describe('Coder portal: My charts', () => {
               remarks: 'Priority',
               loginName: 'naveen@vlms.com',
               allocatedAt: '2026-10-09T08:00:00.000Z',
+              heldAt: null,
+              holdReason: null,
               project: { id: 'p1', name: 'Cardiology Q4', client: 'Acme Health' },
             },
           ],
@@ -307,6 +309,53 @@ describe('Coder portal: My charts', () => {
     expect(within(table).getByText('1-25')).toBeInTheDocument();
     expect(within(table).getByText('Priority')).toBeInTheDocument();
     expect(screen.getAllByText('naveen@vlms.com').length).toBeGreaterThan(0);
+  });
+
+  it('shows the coder dashboard figures and marks held charts', async () => {
+    mockApi({
+      'GET /auth/me': () => json(CODER),
+      'GET /production/dashboard': () =>
+        json({
+          totalCoded: 42,
+          todayCoded: 7,
+          cph: 5.5,
+          activeHours: 7.6,
+          auditPercentage: 96.4,
+          auditedCharts: 10,
+          totalErrors: 3,
+          onHold: 1,
+          pendingWork: 2,
+        }),
+      'GET /allocation/mine': () =>
+        json({
+          loginName: 'naveen@vlms.com',
+          total: 1,
+          charts: [
+            {
+              id: 'ch1',
+              chartId: 'CH-1001',
+              status: 'IN_PRODUCTION',
+              pages: 12,
+              pageBucket: null,
+              remarks: null,
+              loginName: 'naveen@vlms.com',
+              allocatedAt: '2026-10-09T08:00:00.000Z',
+              heldAt: '2026-10-09T09:00:00.000Z',
+              holdReason: 'Waiting on client',
+              project: { id: 'p1', name: 'Cardiology Q4', client: 'Acme Health' },
+            },
+          ],
+        }),
+    });
+    renderWithTheme(<CoderAllotmentWorkspace />);
+    const group = await screen.findByRole('group', { name: 'Your coding figures' });
+    expect(within(group).getByText('Total charts coded')).toBeInTheDocument();
+    expect(within(group).getByText('42')).toBeInTheDocument();
+    expect(within(group).getByText('Today’s charts')).toBeInTheDocument();
+    expect(within(group).getByText('7')).toBeInTheDocument();
+    expect(within(group).getByText('5.5')).toBeInTheDocument();
+    expect(within(group).getByText('96.4%')).toBeInTheDocument();
+    expect(await screen.findByText('On hold')).toBeInTheDocument();
   });
 
   it('says so when nothing is allotted', async () => {
@@ -329,6 +378,8 @@ describe('Coder portal: chart workspace', () => {
     pageBucket: '1-25',
     remarks: null,
     loginName: 'naveen@vlms.com',
+    heldAt: null,
+    holdReason: null,
     project: { id: 'p1', name: 'Cardiology Q4', client: 'Acme Health' },
   };
 
@@ -344,22 +395,54 @@ describe('Coder portal: chart workspace', () => {
     const chartId = await screen.findByLabelText('Chart ID');
     expect(chartId).toHaveValue('CH-1001');
     expect(chartId).toHaveAttribute('readonly');
-    const pages = screen.getByLabelText('Page numbers');
+    const pages = screen.getByLabelText('No of pages');
     expect(pages).toHaveValue('12');
     expect(pages).toHaveAttribute('readonly');
 
-    await user.click(screen.getByRole('button', { name: 'Submit' }));
+    await user.click(screen.getByRole('button', { name: 'Submit chart' }));
     expect(screen.getAllByText('Enter a whole number from 0 to 9999.')).toHaveLength(2);
     expect(calls.some((c) => c.url.endsWith('/submit'))).toBe(false);
 
-    await user.type(screen.getByLabelText('ICDs'), '5');
-    await user.type(screen.getByLabelText('DOS'), '2');
-    await user.click(screen.getByRole('button', { name: 'Submit' }));
+    await user.type(screen.getByLabelText('No of ICDs'), '5');
+    await user.type(screen.getByLabelText('No of DOS'), '2');
+    expect(screen.getByLabelText('Coded date')).toHaveAttribute('readonly');
+    await user.type(screen.getByLabelText('Remarks'), 'Unclear scan');
+    await user.click(screen.getByRole('button', { name: 'Submit chart' }));
     expect(await screen.findByText(/sent for audit/)).toBeInTheDocument();
     const submit = calls.find((c) => c.url.endsWith('/submit'));
-    expect(JSON.parse(String(submit?.init.body))).toEqual({ icds: 5, dos: 2 });
+    expect(JSON.parse(String(submit?.init.body))).toEqual({ icds: 5, dos: 2, remarks: 'Unclear scan' });
     await user.click(screen.getByRole('button', { name: 'Back to my charts' }));
     expect(push).toHaveBeenCalledWith('/coder');
+  });
+
+  it('holds a chart with a required reason, blocks submit while held, and resumes', async () => {
+    const held = { ...workspace, heldAt: '2026-10-09T09:00:00.000Z', holdReason: 'Waiting on client' };
+    const calls = mockApi({
+      'GET /auth/me': () => json(CODER),
+      'POST /production/charts/p1/open': () => json(workspace),
+      'POST /production/charts/p1/hold': () => json(held),
+      'POST /production/charts/p1/resume': () => json(workspace),
+    });
+    const user = userEvent.setup();
+    renderWithTheme(<CoderChartWorkspace />);
+    await screen.findByLabelText('Chart ID');
+    await user.click(screen.getByRole('button', { name: 'Hold chart' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm hold' }));
+    expect(await screen.findByText('Enter the reason for holding this chart')).toBeInTheDocument();
+    expect(calls.some((c) => c.url.endsWith('/hold'))).toBe(false);
+
+    await user.type(screen.getByLabelText('Hold reason'), 'Waiting on client');
+    await user.click(screen.getByRole('button', { name: 'Confirm hold' }));
+    expect(await screen.findByText(/On hold\./)).toBeInTheDocument();
+    expect(screen.getByText(/Waiting on client/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Submit chart' })).toBeDisabled();
+    expect(screen.getByLabelText('No of ICDs')).toBeDisabled();
+    const hold = calls.find((c) => c.url.endsWith('/hold'));
+    expect(JSON.parse(String(hold?.init.body))).toEqual({ reason: 'Waiting on client' });
+
+    await user.click(screen.getByRole('button', { name: 'Resume chart' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Submit chart' })).toBeEnabled());
+    expect(screen.getByRole('button', { name: 'Hold chart' })).toBeInTheDocument();
   });
 
   it('explains when the chart is not available to this coder', async () => {

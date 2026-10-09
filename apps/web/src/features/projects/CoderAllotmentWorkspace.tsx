@@ -12,7 +12,7 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
-import type { MyAllotment } from '@smartcode/shared';
+import type { CoderDashboard, MyAllotment } from '@smartcode/shared';
 import NextLink from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { EmptyState } from '@/components/EmptyState';
@@ -20,10 +20,29 @@ import { env } from '@/env';
 import { RequireSession, useSession } from '@/features/auth/session';
 import { chartStatusLabel, formatDateTime, useResource } from './shared';
 
+function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <Paper variant="outlined" sx={{ p: 2.5, flex: '1 1 200px', minWidth: 180 }}>
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography variant="h3" component="p" sx={{ fontVariantNumeric: 'tabular-nums', mt: 0.5 }}>
+        {value}
+      </Typography>
+      {hint && (
+        <Typography variant="caption" color="text.secondary">
+          {hint}
+        </Typography>
+      )}
+    </Paper>
+  );
+}
+
 function Allotment() {
   const { profile, signOut } = useSession();
   const data = useResource<MyAllotment>('/allocation/mine');
   const allotment = data.data;
+  const dash = useResource<CoderDashboard>('/production/dashboard').data;
 
   return (
     <AppShell
@@ -39,6 +58,34 @@ function Allotment() {
           <Alert severity="error" role="alert">
             {data.error}
           </Alert>
+        )}
+        {dash && (
+          <Box
+            sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}
+            role="group"
+            aria-label="Your coding figures"
+          >
+            <Tile label="Total charts coded" value={String(dash.totalCoded)} />
+            <Tile label="Today’s charts" value={String(dash.todayCoded)} />
+            <Tile
+              label="CPH (charts per hour)"
+              value={dash.cph === null ? '—' : dash.cph.toFixed(1)}
+              hint={
+                dash.cph === null
+                  ? 'Calculated from your active time once you submit a chart'
+                  : `Over ${dash.activeHours} active hours; time on hold is not counted`
+              }
+            />
+            <Tile
+              label="Audit percentage"
+              value={dash.auditPercentage === null ? '—' : `${dash.auditPercentage.toFixed(1)}%`}
+              hint={
+                dash.auditPercentage === null
+                  ? 'Appears after your first chart is audited'
+                  : `${dash.totalErrors} error${dash.totalErrors === 1 ? '' : 's'} in ${dash.auditedCharts} audited chart${dash.auditedCharts === 1 ? '' : 's'}`
+              }
+            />
+          </Box>
         )}
         {allotment && (
           <Paper variant="outlined" sx={{ p: 2.5, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -109,7 +156,16 @@ function Allotment() {
                       <TableCell>{c.pageBucket ?? '—'}</TableCell>
                       <TableCell sx={{ maxWidth: 280 }}>{c.remarks ?? '—'}</TableCell>
                       <TableCell>
-                        <Chip size="small" variant="outlined" label={chartStatusLabel(c.status)} />
+                        {c.heldAt ? (
+                          <Chip
+                            size="small"
+                            color="warning"
+                            label="On hold"
+                            title={c.holdReason ?? undefined}
+                          />
+                        ) : (
+                          <Chip size="small" variant="outlined" label={chartStatusLabel(c.status)} />
+                        )}
                       </TableCell>
                       <TableCell>{formatDateTime(c.allocatedAt)}</TableCell>
                     </TableRow>

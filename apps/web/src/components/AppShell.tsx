@@ -20,6 +20,7 @@ import { groupedNavigation } from '@/features/navigation/navigation';
 import { tokens } from '@/theme/tokens';
 import { BrandLogo } from './BrandLogo';
 import { EnvironmentBadge } from './EnvironmentBadge';
+import { NotificationBell } from './NotificationBell';
 
 export interface AppShellProps {
   role: Role;
@@ -148,6 +149,7 @@ export function AppShell({ role, title, currentPath, appEnv, userName, onSignOut
               {title}
             </Typography>
             <EnvironmentBadge appEnv={appEnv} />
+            {userName && <NotificationBell />}
             <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
               {userName ? `${userName} · ${ROLE_LABELS[role]}` : ROLE_LABELS[role]}
             </Typography>

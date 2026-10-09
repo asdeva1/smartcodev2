@@ -34,6 +34,8 @@ import { FormDialog, useAction, usePagedList } from '../admin/ui';
 import { chartStatusLabel, formatDateTime } from './shared';
 
 const PULLABLE = new Set(['ALLOCATED', 'IN_PRODUCTION']);
+/** A chart the coder has on hold cannot be pulled back. */
+const canPullBack = (c: { status: string; heldAt: string | null }) => PULLABLE.has(c.status) && !c.heldAt;
 const STATUS_FILTERS = [
   'PENDING_ALLOCATION',
   'ALLOCATED',
@@ -72,7 +74,7 @@ export function ProjectAllocation({
   });
   const active = project.status === 'ACTIVE';
   const rows = list.data?.items ?? [];
-  const pullableRows = rows.filter((r) => PULLABLE.has(r.status));
+  const pullableRows = rows.filter(canPullBack);
   const completedWaiting = (project.chartsByStatus.COMPLETED ?? 0) - project.submittedToClient;
   const openCharts = (project.chartsByStatus.ALLOCATED ?? 0) + (project.chartsByStatus.IN_PRODUCTION ?? 0);
 
@@ -218,7 +220,7 @@ export function ProjectAllocation({
                       <TableCell padding="checkbox">
                         <Checkbox
                           size="small"
-                          disabled={!PULLABLE.has(c.status)}
+                          disabled={!canPullBack(c)}
                           checked={selected.has(c.id)}
                           onChange={() => toggle(c.id)}
                           slotProps={{ input: { 'aria-label': `Select ${c.chartId}` } }}
@@ -227,6 +229,20 @@ export function ProjectAllocation({
                       <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{c.chartId}</TableCell>
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>
                         <Chip size="small" variant="outlined" label={chartStatusLabel(c.status)} />
+                        {c.heldAt && (
+                          <Chip
+                            size="small"
+                            color="warning"
+                            label="On hold"
+                            title={c.holdReason ?? undefined}
+                            sx={{ ml: 0.75 }}
+                          />
+                        )}
+                        {c.heldAt && c.holdReason && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            {c.holdReason}
+                          </Typography>
+                        )}
                       </TableCell>
                       <TableCell>{c.allocation?.loginName ?? '—'}</TableCell>
                       <TableCell>{c.allocation ? c.allocation.assignedTo.fullName : '—'}</TableCell>
