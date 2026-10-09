@@ -152,6 +152,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     available: true,
   },
   {
+    key: 'approvals',
+    label: 'Approvals',
+    href: '/approvals',
+    permission: 'notification.read',
+    group: 'Administration',
+    available: true,
+    onlyRoles: ['MANAGER', 'TEAM_LEAD', 'HR', 'VENDOR_ADMIN', 'GROUP_COACH'],
+  },
+  {
     key: 'activity',
     label: 'Activity',
     href: '/activity',

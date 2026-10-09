@@ -18,6 +18,7 @@ import { OrganizationModule } from './modules/organization/organization.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DashboardsModule } from './modules/dashboards/dashboards.module';
 import { LogsModule } from './modules/logs/logs.module';
+import { ApprovalsModule } from './modules/approvals/approvals.module';
 import { ProductionModule } from './modules/production/production.module';
 import { AuditsModule } from './modules/audits/audits.module';
 import { ProjectsModule } from './modules/projects/projects.module';
@@ -56,6 +57,7 @@ export class AppModule {
         NotificationsModule,
         DashboardsModule,
         LogsModule,
+        ApprovalsModule,
         AuditsModule,
       ],
       controllers: [HealthController, MetaController],
