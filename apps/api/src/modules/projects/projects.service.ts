@@ -241,6 +241,8 @@ export class ProjectsService {
           pages: c.pages,
           pageBucket: c.pageBucket,
           remarks: c.remarks,
+          heldAt: c.heldAt?.toISOString() ?? null,
+          holdReason: c.holdReason,
           allocation: a
             ? {
                 loginName: a.loginName.value,

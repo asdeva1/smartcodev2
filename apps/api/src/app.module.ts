@@ -15,6 +15,7 @@ import { AuthApiModule } from './modules/auth/auth.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { MetaController } from './modules/meta/meta.controller';
 import { OrganizationModule } from './modules/organization/organization.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ProductionModule } from './modules/production/production.module';
 import { AuditsModule } from './modules/audits/audits.module';
 import { ProjectsModule } from './modules/projects/projects.module';
@@ -50,6 +51,7 @@ export class AppModule {
         AllocationModule,
         ProjectsModule,
         ProductionModule,
+        NotificationsModule,
         AuditsModule,
       ],
       controllers: [HealthController, MetaController],

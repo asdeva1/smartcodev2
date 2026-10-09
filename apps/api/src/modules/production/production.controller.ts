@@ -1,5 +1,10 @@
 import { Body, Controller, HttpCode, Param, Post } from '@nestjs/common';
-import { type ProductionSubmit, productionSubmitSchema } from '@smartcode/shared';
+import {
+  type HoldChart,
+  holdChartSchema,
+  type ProductionSubmit,
+  productionSubmitSchema,
+} from '@smartcode/shared';
 import { CurrentPrincipal, RequirePermission } from '../../core/auth/decorators';
 import type { Principal } from '../../core/auth/principal';
 import { Meta, type RequestMeta } from '../../core/auth/request-meta';
@@ -17,6 +22,29 @@ export class ProductionController {
   @HttpCode(200)
   open(@CurrentPrincipal() p: Principal, @Param('id', new UuidParamPipe()) id: string) {
     return this.production.open(p, id);
+  }
+
+  @Post(':id/hold')
+  @RequirePermission('production.submit')
+  @HttpCode(200)
+  hold(
+    @CurrentPrincipal() p: Principal,
+    @Param('id', new UuidParamPipe()) id: string,
+    @Body(new ZodValidationPipe(holdChartSchema)) body: HoldChart,
+    @Meta() meta: RequestMeta,
+  ) {
+    return this.production.hold(p, id, body, meta);
+  }
+
+  @Post(':id/resume')
+  @RequirePermission('production.submit')
+  @HttpCode(200)
+  resume(
+    @CurrentPrincipal() p: Principal,
+    @Param('id', new UuidParamPipe()) id: string,
+    @Meta() meta: RequestMeta,
+  ) {
+    return this.production.resume(p, id, meta);
   }
 
   @Post(':id/submit')

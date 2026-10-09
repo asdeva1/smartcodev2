@@ -89,6 +89,8 @@ export class AllocationService {
         remarks: a.chart.remarks,
         loginName: a.loginName.value,
         allocatedAt: a.allocatedAt.toISOString(),
+        heldAt: a.chart.heldAt?.toISOString() ?? null,
+        holdReason: a.chart.holdReason,
         project: { id: a.chart.project.id, name: a.chart.project.name, client: a.chart.project.client.name },
       })),
     };

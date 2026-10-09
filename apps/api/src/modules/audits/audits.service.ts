@@ -13,6 +13,7 @@ import type { Principal } from '../../core/auth/principal';
 import type { RequestMeta } from '../../core/auth/request-meta';
 import { ProblemException } from '../../core/errors/problem';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { createNotification } from '../notifications/notifications.service';
 import { logEntityChange } from '../organization/entity-log';
 import { projectScopeWhere } from '../projects/project-scope';
 
@@ -156,6 +157,19 @@ export class AuditsService {
           chartStatus = 'REVIEW_REQUIRED';
         }
 
+        // The coder is told as soon as an audit finds errors in their chart.
+        if (submitted.totalErrors > 0) {
+          await createNotification(tx, {
+            organizationId: principal.organizationId,
+            recipientId: current.coderId,
+            type: 'AUDIT_ERRORS',
+            subject: `Audit errors on chart ${chart.chartRef}`,
+            message: `${submitted.totalErrors} error${submitted.totalErrors === 1 ? '' : 's'} found (${input.auditErrors} audit, ${input.errorExceptions} exception).`,
+            entityType: 'Chart',
+            entityId: chartId,
+          });
+        }
+
         await logEntityChange(
           { audit: this.audit, activity: this.activity },
           tx,
@@ -291,6 +305,15 @@ export class AuditsService {
           { after: { decision: input.decision, ...(input.reason ? { reason: input.reason } : {}) } },
         );
         if (input.decision === 'REJECTED') {
+          await createNotification(tx, {
+            organizationId: principal.organizationId,
+            recipientId: audit.productionEntry.coderId,
+            type: 'REWORK_ASSIGNED',
+            subject: `Rework needed on chart ${audit.chart.chartRef}`,
+            message: input.reason ?? 'The Manager sent this chart back for correction.',
+            entityType: 'Chart',
+            entityId: audit.chartId,
+          });
           await logEntityChange(
             { audit: this.audit, activity: this.activity },
             tx,

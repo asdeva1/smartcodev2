@@ -460,7 +460,14 @@ export class ProjectAllocationService {
     });
     await tx.chart.update({
       where: { id: chart.id },
-      data: { status: 'PENDING_ALLOCATION', allocatedAt: null },
+      data: {
+        status: 'PENDING_ALLOCATION',
+        allocatedAt: null,
+        workStartedAt: null,
+        heldAt: null,
+        holdReason: null,
+        heldSeconds: 0,
+      },
     });
     await logEntityChange(
       { audit: this.audit, activity: this.activity },
@@ -486,7 +493,13 @@ export class ProjectAllocationService {
       { actorId: principal.employeeId, reason: reason ?? 'Manager pull-back' },
       async (tx) => {
         const charts = await tx.chart.findMany({
-          where: { projectId, id: { in: chartIds }, status: { in: [...OPEN_CHART_STATUSES] } },
+          // A chart the coder has on hold cannot be pulled back (it is skipped, not an error).
+          where: {
+            projectId,
+            id: { in: chartIds },
+            status: { in: [...OPEN_CHART_STATUSES] },
+            heldAt: null,
+          },
           select: { id: true, status: true },
         });
         for (const chart of charts) await this.pullBackChart(tx, principal, chart, meta, 'MANAGER');

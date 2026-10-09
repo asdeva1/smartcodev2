@@ -540,6 +540,13 @@ model Chart {
   pages          Int?
   pageBucket     String?     @map("page_bucket") @db.VarChar(64)
   remarks        String?
+  /// Coder module: when the coder first opened the chart, and the hold state. While `heldAt` is set the chart is
+  /// "On hold": it stays IN_PRODUCTION with the coder, cannot be submitted and cannot be pulled back by the Manager.
+  /// `heldSeconds` is the total time spent on hold so far (excluded from the coder's active time).
+  workStartedAt  DateTime?   @map("work_started_at") @db.Timestamptz(3)
+  heldAt         DateTime?   @map("held_at") @db.Timestamptz(3)
+  holdReason     String?     @map("hold_reason") @db.VarChar(500)
+  heldSeconds    Int         @default(0) @map("held_seconds")
   /// Set when the Manager submits the finished chart back to the client.
   submittedToClientAt   DateTime? @map("submitted_to_client_at") @db.Timestamptz(3)
   submittedToClientById String?   @map("submitted_to_client_by_id") @db.Uuid
@@ -645,6 +652,8 @@ model ProductionEntry {
   codedAt      DateTime?        @map("coded_at") @db.Timestamptz(3)
   submittedAt  DateTime?        @map("submitted_at") @db.Timestamptz(3)
   remarks      String?
+  /// Seconds the coder actively worked on this version (open → submit, hold time excluded). Drives CPH.
+  activeSeconds Int?             @map("active_seconds")
   /// Set when this version is the correction produced by a rework.
   reworkId     String?          @unique @map("rework_id") @db.Uuid
   createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)

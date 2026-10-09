@@ -154,6 +154,9 @@ export interface ProjectChartRecord {
     allocatedAt: string;
   } | null;
   submittedToClientAt: string | null;
+  /** Set while the coder has the chart on hold; the Manager cannot pull a held chart back. */
+  heldAt: string | null;
+  holdReason: string | null;
   updatedAt: string;
 }
 
@@ -290,6 +293,8 @@ export interface AllotmentChart {
   remarks: string | null;
   loginName: string;
   allocatedAt: string;
+  heldAt: string | null;
+  holdReason: string | null;
   project: { id: string; name: string; client: string };
 }
 
@@ -307,8 +312,17 @@ const countSchema = z.coerce
   .min(0, 'Cannot be negative')
   .max(9999, 'Must be at most 9999');
 
-/** Pages come from the allocation file and cannot be edited by the coder; only ICDs and DOS are entered. */
-export const productionSubmitSchema = z.object({ icds: countSchema, dos: countSchema });
+/** Pages come from the allocation file and cannot be edited by the coder; ICDs, DOS and optional Remarks are entered. */
+export const productionSubmitSchema = z.object({
+  icds: countSchema,
+  dos: countSchema,
+  remarks: z
+    .string()
+    .trim()
+    .max(1000, 'Remarks must be at most 1000 characters')
+    .optional()
+    .transform((v) => (v ? v : undefined)),
+});
 export type ProductionSubmit = z.infer<typeof productionSubmitSchema>;
 
 export interface ChartWorkspace {
@@ -319,8 +333,21 @@ export interface ChartWorkspace {
   pageBucket: string | null;
   remarks: string | null;
   loginName: string;
+  /** Set while the chart is on hold (it cannot be submitted or pulled back until resumed). */
+  heldAt: string | null;
+  holdReason: string | null;
   project: { id: string; name: string; client: string };
 }
+
+/** Putting a chart on hold needs a reason, which the Manager can see. */
+export const holdChartSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(3, 'Enter the reason for holding this chart')
+    .max(500, 'At most 500 characters'),
+});
+export type HoldChart = z.infer<typeof holdChartSchema>;
 
 export interface ProductionSubmitted {
   chartId: string;
@@ -328,4 +355,39 @@ export interface ProductionSubmitted {
   icds: number;
   dos: number;
   pages: number;
+}
+
+// ───────── Coder dashboard & notifications ─────────
+
+export interface CoderDashboard {
+  /** Charts this coder has submitted, ever. */
+  totalCoded: number;
+  /** Charts submitted today (India time). */
+  todayCoded: number;
+  /** Charts per active hour (hold time excluded); null until at least one chart has been timed. */
+  cph: number | null;
+  /** Hours of active work behind the CPH figure. */
+  activeHours: number;
+  /** Error-based accuracy over audited charts: (ICDs + DOS − errors) ÷ (ICDs + DOS) × 100; null until a chart is audited. */
+  auditPercentage: number | null;
+  auditedCharts: number;
+  totalErrors: number;
+  onHold: number;
+  pendingWork: number;
+}
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  subject: string;
+  message: string | null;
+  entityType: string | null;
+  entityId: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationList {
+  unread: number;
+  items: NotificationItem[];
 }
