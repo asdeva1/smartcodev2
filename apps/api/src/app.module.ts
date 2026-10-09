@@ -16,6 +16,7 @@ import { EmployeesModule } from './modules/employees/employees.module';
 import { MetaController } from './modules/meta/meta.controller';
 import { OrganizationModule } from './modules/organization/organization.module';
 import { ProductionModule } from './modules/production/production.module';
+import { AuditsModule } from './modules/audits/audits.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { VendorsModule } from './modules/vendors/vendors.module';
@@ -49,6 +50,7 @@ export class AppModule {
         AllocationModule,
         ProjectsModule,
         ProductionModule,
+        AuditsModule,
       ],
       controllers: [HealthController, MetaController],
       providers: [
