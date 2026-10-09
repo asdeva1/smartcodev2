@@ -41,7 +41,7 @@ export const loginNameSchema = z
 export const personNameSchema = z.string().trim().min(1, 'Name is required').max(120);
 
 /** Password policy (docs/06-authentication.md). Strength scoring is added server-side in Phase 3. */
-export const PASSWORD_MIN_LENGTH = 12;
+export const PASSWORD_MIN_LENGTH = 6;
 export const PASSWORD_MAX_LENGTH = 128;
 export const passwordSchema = z
   .string()

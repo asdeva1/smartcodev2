@@ -125,7 +125,7 @@ export function SetPasswordForm({ kind, token }: { kind: LinkKind; token: string
         autoComplete="new-password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        helperText="At least 12 characters. A short phrase of unrelated words works well."
+        helperText="At least 6 characters. A short phrase of unrelated words works well."
         autoFocus
       />
       <TextField

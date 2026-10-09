@@ -172,9 +172,9 @@ describe('Activation and reset pages', () => {
     await screen.findByText(/Setting the password for Casey Coder/);
     const submit = screen.getByRole('button', { name: 'Activate account' });
 
-    await userEvent.type(screen.getByLabelText('New password'), 'short');
+    await userEvent.type(screen.getByLabelText('New password'), 'abc');
     await userEvent.click(submit);
-    expect(await screen.findByRole('alert')).toHaveTextContent(/at least 12/);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/at least 6/);
 
     await userEvent.clear(screen.getByLabelText('New password'));
     await userEvent.type(screen.getByLabelText('New password'), 'Correct-Horse-Battery-7');
