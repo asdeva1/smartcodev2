@@ -103,7 +103,7 @@ export function ProjectAllocation({
           Upload CSV
         </Button>
         <Button variant="outlined" disabled={!active} onClick={() => setDialog('assign')}>
-          Add chart
+          Assign chart
         </Button>
         <Button
           variant="outlined"
@@ -170,7 +170,7 @@ export function ProjectAllocation({
         ) : list.data && list.data.total === 0 ? (
           <EmptyState
             title={q || status ? 'No charts match' : 'No charts in this project yet'}
-            description="Upload a CSV of charts (Chart ID, Pages, Page Bucket, Remarks) to store them here, then use Add chart to allot each one to a coder."
+            description="Upload the team-allocation CSV (ChartID, PageCount, PageBucket, Emp Email, Client Login, Status, comments), or use Assign chart to allot one chart."
             action={
               !q && !status && active ? (
                 <Button variant="contained" onClick={() => setDialog('upload')}>
@@ -286,17 +286,18 @@ export function ProjectAllocation({
 
       {dialog === 'upload' && (
         <CsvImportDialog
-          title="Upload chart CSV"
+          title="Upload CSV"
           columns={REPOSITORY_CSV_COLUMNS}
-          templateRow="CH-10001,12,1-25,Priority"
-          guidance="Each row stores one chart in this project’s chart list, waiting to be allotted. Pages, Page Bucket and Remarks are optional. Delete the example row from the template before you upload. Use Add chart to allot a stored chart to a coder."
+          requiredColumns={['ChartID']}
+          templateRow="609588329,107,100-249 Pages,naveen@smartcluestech.com,naveen@vlms.com,,"
+          guidance="Use the team-allocation template: ChartID, PageCount, PageBucket, Emp Email, Client Login, Status, comments. Every row stores a chart in this project. A row with both Emp Email and Client Login is also allotted to that coder and shows in the coder’s portal; leave both empty to allot it later with Assign chart. Status is ignored. Save the sheet as CSV (File → Save As → CSV) before you upload. Delete the example row before you upload."
           previewPath={`/projects/${project.id}/charts/import/preview`}
           commitPath={`/projects/${project.id}/charts/import/commit`}
-          doneVerb="stored"
+          doneVerb="saved"
           onClose={(changed) => {
             setDialog(null);
             if (changed) {
-              onToast('Charts stored. Use Add chart to allot them to a coder.');
+              onToast('Charts saved. Allotted charts now show in the coders’ portals.');
               refreshAll();
             }
           }}

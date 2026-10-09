@@ -15,8 +15,8 @@ export function refusalText(result: CsvResult): string {
 }
 
 /**
- * "Add chart": a chart that is already in the project's repository (uploaded with the CSV) is allocated to a coder.
- * The Login Name is linked to the coder's email when the coder has none yet.
+ * "Assign chart": the Manager enters Chart ID, Page Number, Client Login and the coder's email; the chart shows in that
+ * coder's allotment. The Client Login is linked to the coder's email when the coder has none yet.
  */
 export function AssignChartDialog({
   projectId,
@@ -29,6 +29,7 @@ export function AssignChartDialog({
 }) {
   const coders = members.filter((m) => m.projectRole === 'CODER');
   const [chartId, setChartId] = useState('');
+  const [pages, setPages] = useState('');
   const [loginName, setLoginName] = useState('');
   const [email, setEmail] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -40,33 +41,40 @@ export function AssignChartDialog({
 
   return (
     <FormDialog
-      title="Add chart"
+      title="Assign chart"
       onClose={() => onClose(null)}
-      submitLabel="Add chart"
+      submitLabel="Assign chart"
       busy={action.busy}
       error={action.error}
       onSubmit={() => {
         if (!chartId.trim()) return setFieldError('Enter the Chart ID.');
+        if (pages.trim() && !/^\d+$/.test(pages.trim()))
+          return setFieldError('Page number must be a whole number.');
         if (!email.trim()) return setFieldError('Enter the employee email.');
         const name = (lockedName ?? loginName).trim();
-        if (!name) return setFieldError('Enter the Login Name.');
+        if (!name) return setFieldError('Enter the Client Login.');
         setFieldError(null);
         void action.run(async () => {
           const r = await apiFetch<CsvResult>(`/projects/${projectId}/charts/assign`, {
             method: 'POST',
-            body: JSON.stringify({ chartId: chartId.trim(), loginName: name, email: email.trim() }),
+            body: JSON.stringify({
+              chartId: chartId.trim(),
+              ...(pages.trim() ? { pages: Number(pages.trim()) } : {}),
+              loginName: name,
+              email: email.trim(),
+            }),
           });
           if (!r.committed) {
             setFieldError(refusalText(r));
             return null;
           }
-          return `Chart ${chartId.trim()} added to ${name}. It now shows in the coder’s allotment.`;
+          return `Chart ${chartId.trim()} assigned to ${name}. It now shows in the coder’s allotment.`;
         });
       }}
     >
       <Typography variant="body2" color="text.secondary">
-        The chart must already be in this project’s chart list (upload it with the CSV first). Adding it
-        allots it to the coder, who then sees it in their portal.
+        Assign one chart without a file. It shows in the coder’s allotment and dashboard straight away. For a
+        chart that is already in the list from the CSV, leave the page number empty to keep its pages.
       </Typography>
       <TextField
         size="small"
@@ -75,6 +83,14 @@ export function AssignChartDialog({
         value={chartId}
         onChange={(e) => setChartId(e.target.value)}
         error={Boolean(fieldError) && !chartId.trim()}
+      />
+      <TextField
+        size="small"
+        label="Page number"
+        value={pages}
+        onChange={(e) => setPages(e.target.value)}
+        slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+        helperText="Required for a chart that is not in the list yet."
       />
       <Autocomplete
         freeSolo
@@ -85,7 +101,7 @@ export function AssignChartDialog({
           <TextField
             {...params}
             size="small"
-            label="Employee email"
+            label="Email ID"
             required
             helperText="Pick a coder on this project or type another coder’s email."
           />
@@ -93,14 +109,14 @@ export function AssignChartDialog({
       />
       <TextField
         size="small"
-        label="Login Name"
+        label="Client Login"
         required
         value={lockedName ?? loginName}
         disabled={Boolean(lockedName)}
         onChange={(e) => setLoginName(e.target.value)}
         helperText={
           lockedName
-            ? 'This coder’s existing Login Name.'
+            ? 'This coder’s existing Client Login.'
             : 'Linked to the email above, and to the chart, when you add it.'
         }
         error={Boolean(fieldError) && !(lockedName ?? loginName).trim()}

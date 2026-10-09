@@ -186,12 +186,12 @@ describe('Project detail', () => {
     expect(screen.getByRole('button', { name: /Completed charts \(2\)/ })).toBeEnabled();
     await user.click((await screen.findAllByRole('button', { name: 'Upload CSV' }))[0]!);
     const dialog = await screen.findByRole('dialog');
-    for (const col of ['Chart ID', 'Pages', 'Page Bucket', 'Remarks']) {
+    for (const col of ['ChartID', 'PageCount', 'PageBucket', 'Emp Email', 'Client Login', 'comments']) {
       expect(within(dialog).getAllByText(new RegExp(col)).length).toBeGreaterThan(0);
     }
   });
 
-  it('Add chart: sends Chart ID, Login Name and employee email to the assign endpoint', async () => {
+  it('Assign chart: sends Chart ID, page number, Client Login and email to the assign endpoint', async () => {
     const user = userEvent.setup();
     const calls = mockApi({
       'GET /auth/me': () => json(MANAGER),
@@ -209,22 +209,24 @@ describe('Project detail', () => {
     renderWithTheme(<ProjectDetailWorkspace />);
     const tabs = await screen.findByRole('tablist', { name: 'Project sections' });
     await user.click(within(tabs).getByRole('tab', { name: 'Chart allocation' }));
-    await user.click((await screen.findAllByRole('button', { name: 'Add chart' }))[0]!);
+    await user.click((await screen.findAllByRole('button', { name: 'Assign chart' }))[0]!);
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByLabelText(/Chart ID/), 'CH-1');
-    await user.type(within(dialog).getByLabelText(/Employee email/), 'naveen@smartcluestech.com');
-    expect(within(dialog).getByLabelText(/Login Name/)).toHaveValue('naveen@vlms.com');
-    await user.click(within(dialog).getByRole('button', { name: 'Add chart' }));
+    await user.type(within(dialog).getByLabelText(/Page number/), '107');
+    await user.type(within(dialog).getByLabelText(/Email ID/), 'naveen@smartcluestech.com');
+    expect(within(dialog).getByLabelText(/Client Login/)).toHaveValue('naveen@vlms.com');
+    await user.click(within(dialog).getByRole('button', { name: 'Assign chart' }));
     await waitFor(() => expect(calls.some((c) => c.url.endsWith('/charts/assign'))).toBe(true));
     const body = JSON.parse(String(calls.find((c) => c.url.endsWith('/charts/assign'))!.init.body));
     expect(body).toEqual({
       chartId: 'CH-1',
+      pages: 107,
       loginName: 'naveen@vlms.com',
       email: 'naveen@smartcluestech.com',
     });
   });
 
-  it('Add chart: shows the reason when the server refuses the chart', async () => {
+  it('Assign chart: shows the reason when the server refuses the chart', async () => {
     const user = userEvent.setup();
     mockApi({
       'GET /auth/me': () => json(MANAGER),
@@ -253,12 +255,12 @@ describe('Project detail', () => {
     renderWithTheme(<ProjectDetailWorkspace />);
     const tabs = await screen.findByRole('tablist', { name: 'Project sections' });
     await user.click(within(tabs).getByRole('tab', { name: 'Chart allocation' }));
-    await user.click((await screen.findAllByRole('button', { name: 'Add chart' }))[0]!);
+    await user.click((await screen.findAllByRole('button', { name: 'Assign chart' }))[0]!);
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByLabelText(/Chart ID/), 'CH-1');
-    await user.type(within(dialog).getByLabelText(/Employee email/), 'nobody@x.test');
-    await user.type(within(dialog).getByLabelText(/Login Name/), 'nb@vlms.com');
-    await user.click(within(dialog).getByRole('button', { name: 'Add chart' }));
+    await user.type(within(dialog).getByLabelText(/Email ID/), 'nobody@x.test');
+    await user.type(within(dialog).getByLabelText(/Client Login/), 'nb@vlms.com');
+    await user.click(within(dialog).getByRole('button', { name: 'Assign chart' }));
     expect(await within(dialog).findByText(/No employee has this Email ID/)).toBeInTheDocument();
   });
 

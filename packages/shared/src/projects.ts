@@ -37,8 +37,16 @@ export const ALLOCATION_CSV_COLUMNS = [
   'Remarks',
 ] as const;
 
-/** Columns of the chart repository file: charts are stored for the project and allocated later. */
-export const REPOSITORY_CSV_COLUMNS = ['Chart ID', 'Pages', 'Page Bucket', 'Remarks'] as const;
+/** Columns of the project chart file (the Manager's team-allocation template). Emp Email + Client Login allot the chart. */
+export const REPOSITORY_CSV_COLUMNS = [
+  'ChartID',
+  'PageCount',
+  'PageBucket',
+  'Emp Email',
+  'Client Login',
+  'Status',
+  'comments',
+] as const;
 
 export const chartIdSchema = z
   .string()
@@ -166,6 +174,12 @@ export interface ProjectChartRecord {
 /** Manual "Add chart": a chart already in the project's repository is allocated to a coder. */
 export const assignChartSchema = z.object({
   chartId: chartIdSchema,
+  pages: z.coerce
+    .number({ error: 'Enter the page number' })
+    .int('Enter a whole number')
+    .min(0, 'Cannot be negative')
+    .max(100000, 'Too large')
+    .optional(),
   loginName: z.string().trim().min(1, 'Login Name is required').max(128),
   email: z.string().trim().min(1, 'Email is required').max(254),
 });

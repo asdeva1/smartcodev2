@@ -40,6 +40,14 @@ interface ApplyRow extends ParsedRow {
   existingChartId: string | null;
 }
 
+/** A chart row of the project chart file: stored in the project's chart list. */
+interface StoreRow {
+  chartRef: string;
+  pages: number | null;
+  pageBucket: string | null;
+  remarks: string | null;
+}
+
 const MAX_PAGES = 100_000;
 
 /**
@@ -74,13 +82,18 @@ export class ProjectAllocationService {
     return project;
   }
 
-  // ───────── chart repository file (store charts, allocate later) ─────────
+  // ───────── project chart file (the Manager's team-allocation template) ─────────
 
+  /**
+   * One file does both jobs: every row stores a chart (ChartID, PageCount, PageBucket, comments) in the project's chart
+   * list; a row that also has "Emp Email" and "Client Login" allots that chart to the coder straight away, using the same
+   * checks as the allocation file. "Status" is read but ignored.
+   */
   async previewRepository(principal: Principal, projectId: string, csv: string): Promise<CsvPreview> {
-    return (await this.validateRepository(principal, projectId, csv)).preview;
+    return (await this.validateTemplate(principal, projectId, csv)).preview;
   }
 
-  private async validateRepository(principal: Principal, projectId: string, csv: string) {
+  private async validateTemplate(principal: Principal, projectId: string, csv: string) {
     await this.manualProject(principal, projectId);
     const { parsed, fileErrors } = readCsv(
       csv,
@@ -89,43 +102,49 @@ export class ProjectAllocationService {
       REPOSITORY_CSV_COLUMNS.slice(1),
     );
     if (!parsed || fileErrors.length) {
-      return { preview: finish([], fileErrors), apply: [] as Omit<ParsedRow, 'email' | 'loginName'>[] };
+      return { preview: finish([], fileErrors), store: [] as StoreRow[], allocate: [] as ApplyRow[] };
     }
     const drafts: Draft[] = parsed.rows.map((row) => ({
       line: row.line,
       values: {
-        'Chart ID': row.cells['chartid'] ?? '',
-        Pages: row.cells['pages'] ?? '',
-        'Page Bucket': row.cells['pagebucket'] ?? '',
-        Remarks: row.cells['remarks'] ?? '',
+        ChartID: row.cells['chartid'] ?? '',
+        PageCount: row.cells['pagecount'] ?? '',
+        PageBucket: row.cells['pagebucket'] ?? '',
+        'Emp Email': row.cells['empemail'] ?? '',
+        'Client Login': row.cells['clientlogin'] ?? '',
+        Status: row.cells['status'] ?? '',
+        comments: row.cells['comments'] ?? '',
       },
       errors: [],
       warnings: [],
       duplicate: false,
     }));
-    const values = new Map<Draft, Omit<ParsedRow, 'email' | 'loginName'>>();
+    const fields = new Map<Draft, StoreRow>();
     for (const d of drafts) {
-      const chartRef = chartIdSchema.safeParse(d.values['Chart ID']);
-      if (!chartRef.success) d.errors.push(chartRef.error.issues[0]?.message ?? 'Chart ID is not valid');
-      else if (startsWithFormulaTrigger(chartRef.data))
-        d.errors.push('Chart ID cannot start with = + - or @');
-      const pagesText = d.values.Pages ?? '';
+      const chartRef = chartIdSchema.safeParse(d.values.ChartID);
+      if (!chartRef.success) d.errors.push(chartRef.error.issues[0]?.message ?? 'ChartID is not valid');
+      else if (startsWithFormulaTrigger(chartRef.data)) d.errors.push('ChartID cannot start with = + - or @');
+      const pagesText = d.values.PageCount ?? '';
       let pages: number | null = null;
       if (pagesText) {
         if (!/^\d+$/.test(pagesText) || Number(pagesText) > MAX_PAGES)
-          d.errors.push(`Pages must be a whole number from 0 to ${MAX_PAGES}`);
+          d.errors.push(`PageCount must be a whole number from 0 to ${MAX_PAGES}`);
         else pages = Number(pagesText);
       }
-      const bucket = d.values['Page Bucket'] ?? '';
-      if (bucket.length > 64) d.errors.push('Page Bucket must be at most 64 characters');
+      const bucket = d.values.PageBucket ?? '';
+      if (bucket.length > 64) d.errors.push('PageBucket must be at most 64 characters');
       else if (bucket && startsWithFormulaTrigger(bucket))
-        d.errors.push('Page Bucket cannot start with = + - or @');
-      const remarks = d.values.Remarks ?? '';
-      if (remarks.length > 1000) d.errors.push('Remarks must be at most 1000 characters');
+        d.errors.push('PageBucket cannot start with = + - or @');
+      const remarks = d.values.comments ?? '';
+      if (remarks.length > 1000) d.errors.push('comments must be at most 1000 characters');
       else if (remarks && startsWithFormulaTrigger(remarks))
-        d.errors.push('Remarks cannot start with = + - or @');
+        d.errors.push('comments cannot start with = + - or @');
+      const email = d.values['Emp Email'] ?? '';
+      const login = d.values['Client Login'] ?? '';
+      if (Boolean(email) !== Boolean(login))
+        d.errors.push('Fill in both Emp Email and Client Login to allot this chart, or leave both empty');
       if (chartRef.success && !d.errors.length)
-        values.set(d, {
+        fields.set(d, {
           chartRef: chartRef.data,
           pages,
           pageBucket: bucket || null,
@@ -134,29 +153,64 @@ export class ProjectAllocationService {
     }
     markRepeats(
       drafts,
-      (d) => values.get(d)?.chartRef.toLowerCase() ?? null,
-      (l) => `This Chart ID is repeated on line ${l.join(', ')}`,
+      (d) => fields.get(d)?.chartRef.toLowerCase() ?? null,
+      (l) => `This ChartID is repeated on line ${l.join(', ')}`,
     );
-    const refs = [...new Set([...values.values()].map((v) => v.chartRef))];
-    const existing = await this.prisma.client.chart.findMany({
-      where: { projectId, chartRef: { in: refs } },
-      select: { chartRef: true, status: true },
-    });
+
+    // Rows with a coder are checked and applied by the allocation rules.
+    const allocDrafts = drafts.filter(
+      (d) => fields.has(d) && !d.duplicate && d.values['Emp Email'] && d.values['Client Login'],
+    );
+    const allocate: ApplyRow[] = [];
+    if (allocDrafts.length) {
+      const one = (v: string) => `"${v.replace(/[\r\n]+/g, ' ').replace(/"/g, '""')}"`;
+      const subCsv = [
+        ALLOCATION_CSV_COLUMNS.join(','),
+        ...allocDrafts.map((d) => {
+          const f = fields.get(d) as StoreRow;
+          return [
+            d.values['Client Login'] ?? '',
+            d.values['Emp Email'] ?? '',
+            f.chartRef,
+            f.pages === null ? '' : String(f.pages),
+            f.pageBucket ?? '',
+            f.remarks ?? '',
+          ]
+            .map(one)
+            .join(',');
+        }),
+      ].join('\n');
+      const sub = await this.validate(principal, projectId, subCsv);
+      sub.preview.rows.forEach((r, i) => {
+        const d = allocDrafts[i] as Draft;
+        d.errors.push(...r.errors);
+        d.warnings.push(...r.warnings);
+        if (r.status === 'DUPLICATE') d.duplicate = true;
+      });
+      for (const row of sub.apply) allocate.push(row);
+    }
+
+    const plain = drafts.filter((d) => fields.has(d) && !allocDrafts.includes(d));
+    const refs = [...new Set(plain.map((d) => (fields.get(d) as StoreRow).chartRef))];
+    const existing = refs.length
+      ? await this.prisma.client.chart.findMany({
+          where: { projectId, chartRef: { in: refs } },
+          select: { chartRef: true, status: true },
+        })
+      : [];
     const byRef = new Map(existing.map((c) => [c.chartRef, c.status]));
-    for (const d of drafts) {
-      const v = values.get(d);
-      if (!v || d.errors.length) continue;
-      const status = byRef.get(v.chartRef);
-      if (status) d.errors.push(`This Chart ID is already in the project (${status})`);
+    for (const d of plain) {
+      if (d.errors.length || d.duplicate) continue;
+      const status = byRef.get((fields.get(d) as StoreRow).chartRef);
+      if (status) d.errors.push(`This ChartID is already in the project (${status})`);
     }
     const preview = finish(drafts, []);
-    const apply = preview.rows
-      .map((r, i) => (r.status === 'VALID' ? values.get(drafts[i] as Draft) : undefined))
-      .filter((x): x is Omit<ParsedRow, 'email' | 'loginName'> => Boolean(x));
-    return { preview, apply };
+    const valid = new Set(preview.rows.map((r, i) => (r.status === 'VALID' ? drafts[i] : null)));
+    const store = plain.filter((d) => valid.has(d)).map((d) => fields.get(d) as StoreRow);
+    return { preview, store, allocate };
   }
 
-  /** Stores the charts of the file in the project's repository, waiting to be allocated. */
+  /** Stores the charts of the file; rows that name a coder are also allotted to that coder. */
   async commitRepository(
     principal: Principal,
     projectId: string,
@@ -164,49 +218,77 @@ export class ProjectAllocationService {
     mode: 'valid-only' | 'all-or-nothing',
     meta: RequestMeta,
   ): Promise<CsvResult> {
-    const { preview, apply } = await this.validateRepository(principal, projectId, csv);
+    const { preview, store, allocate } = await this.validateTemplate(principal, projectId, csv);
     const blocked =
       preview.fileErrors.length > 0 ||
       (mode === 'all-or-nothing' && preview.valid !== preview.total) ||
-      apply.length === 0;
+      store.length + allocate.length === 0;
     if (blocked) return { committed: false, created: 0, skipped: preview.total, createdIds: [], preview };
     const createdIds: string[] = [];
-    await this.prisma.transaction(
-      { actorId: principal.employeeId, reason: 'chart repository file' },
-      async (tx) => {
-        for (const row of apply) {
-          const chart = await tx.chart.create({
-            data: {
-              organizationId: principal.organizationId,
-              projectId,
-              chartRef: row.chartRef,
-              createdById: principal.employeeId,
-              pages: row.pages,
-              pageBucket: row.pageBucket,
-              remarks: row.remarks,
-            },
-            select: { id: true },
-          });
-          createdIds.push(chart.id);
+    let allotted = 0;
+    const storeOne = async (tx: Tx, row: StoreRow) => {
+      const chart = await tx.chart.create({
+        data: {
+          organizationId: principal.organizationId,
+          projectId,
+          chartRef: row.chartRef,
+          createdById: principal.employeeId,
+          pages: row.pages,
+          pageBucket: row.pageBucket,
+          remarks: row.remarks,
+        },
+        select: { id: true },
+      });
+      createdIds.push(chart.id);
+    };
+    const allotOne = async (
+      tx: Tx,
+      row: ApplyRow,
+      seen: { employees: Set<string>; staffed: Set<string> },
+    ) => {
+      createdIds.push(await this.allocateRow(tx, principal, projectId, row, seen, meta));
+      allotted += 1;
+    };
+    const reason = 'project chart file';
+    if (mode === 'all-or-nothing') {
+      const seen = { employees: new Set<string>(), staffed: new Set<string>() };
+      await this.prisma.transaction(
+        { actorId: principal.employeeId, reason },
+        async (tx) => {
+          for (const row of store) await storeOne(tx, row);
+          for (const row of allocate) await allotOne(tx, row, seen);
+        },
+        { timeoutMs: 120_000 },
+      );
+    } else {
+      await this.prisma.transaction(
+        { actorId: principal.employeeId, reason },
+        async (tx) => {
+          for (const row of store) await storeOne(tx, row);
+        },
+        { timeoutMs: 120_000 },
+      );
+      for (const row of allocate) {
+        try {
+          await this.prisma.transaction({ actorId: principal.employeeId, reason }, (tx) =>
+            allotOne(tx, row, { employees: new Set(), staffed: new Set() }),
+          );
+        } catch (error) {
+          // Changed since the preview: leave this row out and keep going.
+          if (!(error instanceof ProblemException) && !(error as { code?: string }).code) throw error;
         }
-        await logEntityChange(
-          { audit: this.audit, activity: this.activity },
-          tx,
-          principal,
-          meta,
-          'PROJECT.CHARTS_IMPORTED',
-          { type: 'Project', id: projectId },
-          {
-            after: {
-              chartsCreated: apply.length,
-              skipped: preview.total - apply.length,
-              mode,
-              repository: true,
-            },
-          },
-        );
-      },
-      { timeoutMs: 120_000 },
+      }
+    }
+    await this.prisma.transaction({ actorId: principal.employeeId, reason }, (tx) =>
+      logEntityChange(
+        { audit: this.audit, activity: this.activity },
+        tx,
+        principal,
+        meta,
+        'PROJECT.CHARTS_IMPORTED',
+        { type: 'Project', id: projectId },
+        { after: { stored: store.length, allotted, skipped: preview.total - createdIds.length, mode } },
+      ),
     );
     return {
       committed: true,
@@ -218,8 +300,9 @@ export class ProjectAllocationService {
   }
 
   /**
-   * Manual "Add chart": allocates one chart that is already in the repository to a coder. The Login Name is linked to
-   * the Email (when the coder has none yet) and the chart is allotted under it, using the same checks as the file.
+   * Manual "Assign chart": allots one chart to a coder. A chart that is not in the project's chart list yet is created
+   * with the page number given; one that was uploaded keeps its pages unless a number is given. The Client Login is linked
+   * to the email when the coder has none yet, using the same checks as the file.
    */
   async assign(
     principal: Principal,
@@ -230,15 +313,30 @@ export class ProjectAllocationService {
     const quote = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const csv = [
       ALLOCATION_CSV_COLUMNS.join(','),
-      [input.loginName, input.email, input.chartId, '', '', ''].map(quote).join(','),
+      [
+        input.loginName,
+        input.email,
+        input.chartId,
+        input.pages === undefined ? '' : String(input.pages),
+        '',
+        '',
+      ]
+        .map(quote)
+        .join(','),
     ].join('\n');
     const { preview, apply } = await this.validate(principal, projectId, csv);
     const row = apply[0];
-    if (preview.fileErrors.length === 0 && preview.valid === 1 && row && !row.existingChartId) {
+    if (
+      preview.fileErrors.length === 0 &&
+      preview.valid === 1 &&
+      row &&
+      !row.existingChartId &&
+      row.pages === null
+    ) {
       throw new ProblemException(
-        404,
-        'NOT_FOUND',
-        'This Chart ID is not in the project’s chart repository. Upload it with the CSV first.',
+        422,
+        'VALIDATION_FAILED',
+        'Enter the page number — this chart is not in the project’s chart list yet.',
       );
     }
     return this.commit(principal, projectId, csv, 'all-or-nothing', meta);
