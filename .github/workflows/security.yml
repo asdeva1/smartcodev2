@@ -50,3 +50,10 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
+          format: table
+          output: trivy-report.txt
+      - name: Show scan findings
+        if: failure()
+        shell: bash
+        run: |
+          [ -f trivy-report.txt ] && grep -E 'CVE-|GHSA-|Total|HIGH|CRITICAL|error|FATAL' trivy-report.txt | head -n 25 | while IFS= read -r line; do echo "::error::${line}"; done || echo '::error::no trivy report was written'
