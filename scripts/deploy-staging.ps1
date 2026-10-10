@@ -54,10 +54,10 @@ node infra/cdk/scripts/run-task.mjs --profile $p --region $r --cluster $cluster 
 Write-Host "== 5/7 Wait for the new API to be healthy" -ForegroundColor Cyan
 $ok = $false
 for ($i = 0; $i -lt 30; $i++) {
-  try { $h = Invoke-RestMethod "$api/health/ready" -TimeoutSec 10; if ($h.status -eq "ok") { $ok = $true; break } } catch { }
+  try { $h = Invoke-RestMethod "$api/health/ready" -TimeoutSec 10; if ($h.status -eq "ready" -or $h.status -eq "ok") { $ok = $true; break } } catch { }
   Start-Sleep -Seconds 10
 }
-if (-not $ok) { throw "API did not become ready within 5 minutes. Check the ECS service events." }
+if (-not $ok) { aws ecs describe-services --profile $p --region $r --cluster $cluster --services $svc --query "services[0].events[:5].message" --output text; throw "API did not become ready within 5 minutes. See the ECS events above." }
 Write-Host "API ready."
 
 Write-Host "== 6/7 Smoke test" -ForegroundColor Cyan
