@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import * as shared from '../src/index';
+import * as shared from '../src/index.js';
 
 const ID = '0199c0de-0000-7000-8000-000000000001';
 

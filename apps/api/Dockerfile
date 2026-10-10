@@ -28,6 +28,8 @@ CMD ["pnpm", "exec", "prisma", "migrate", "deploy"]
 FROM node:${NODE_VERSION} AS runtime
 ENV NODE_ENV=production APP_MODE=api PORT=4000
 WORKDIR /app
+# Apply the OS security fixes published since the base image was built (the image scan fails on fixable HIGH/CRITICAL).
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
 COPY --from=build --chown=node:node /out /app
 USER node
 EXPOSE 4000
