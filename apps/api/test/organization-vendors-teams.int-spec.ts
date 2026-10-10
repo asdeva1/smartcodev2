@@ -210,8 +210,10 @@ describeDb('Phase 4 — Organization, Vendors, Teams and vendor isolation (HTTP 
 
     beforeAll(async () => {
       inHouse = (await as(app, manager).post('/teams', { name: 'In-house Alpha' }).expect(201)).body;
-      teamA = (await as(app, manager).post('/teams', { name: 'Team A1', vendorId: vendorA.id }).expect(201)).body;
-      teamB = (await as(app, manager).post('/teams', { name: 'Team B1', vendorId: vendorB.id }).expect(201)).body;
+      teamA = (await as(app, manager).post('/teams', { name: 'Team A1', vendorId: vendorA.id }).expect(201))
+        .body;
+      teamB = (await as(app, manager).post('/teams', { name: 'Team B1', vendorId: vendorB.id }).expect(201))
+        .body;
       leadA = await createActiveEmployee(app, adminA, {
         employeeCode: 'TA-LEAD',
         fullName: 'Lead A',
@@ -262,7 +264,9 @@ describeDb('Phase 4 — Organization, Vendors, Teams and vendor isolation (HTTP 
     });
 
     it('adds members, moves them between teams, sets a Team Lead and removes members', async () => {
-      const second = (await as(app, manager).post('/teams', { name: 'Team A2', vendorId: vendorA.id }).expect(201)).body;
+      const second = (
+        await as(app, manager).post('/teams', { name: 'Team A2', vendorId: vendorA.id }).expect(201)
+      ).body;
       await as(app, adminA).post(`/teams/${teamA.id}/members`, { employeeId: coderA.id }).expect(200);
       const lead = await as(app, adminA).patch(`/teams/${teamA.id}`, { teamLeadId: leadA.id }).expect(200);
       expect(lead.body.teamLead.id).toBe(leadA.id);
