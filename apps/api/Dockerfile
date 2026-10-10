@@ -30,6 +30,8 @@ ENV NODE_ENV=production APP_MODE=api PORT=4000
 WORKDIR /app
 # Apply the OS security fixes published since the base image was built (the image scan fails on fixable HIGH/CRITICAL).
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
+# The API never runs npm; the copy bundled with the base image carries its own dependencies (and their advisories).
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 COPY --from=build --chown=node:node /out /app
 USER node
 EXPOSE 4000

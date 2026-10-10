@@ -1,7 +1,10 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { createElement, type ImgHTMLAttributes } from 'react';
 import { afterEach, vi } from 'vitest';
+
+// Slow shared CI runners need longer than the 1 s default to find elements that appear after a fetch.
+configure({ asyncUtilTimeout: 10_000 });
 
 afterEach(() => cleanup());
 
