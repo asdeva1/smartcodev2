@@ -3,6 +3,8 @@
 //   SMOKE_API_URL=https://api.example.com SMOKE_WEB_URL=https://app.example.com pnpm smoke
 // Exit code 1 when any check fails.
 const api = (process.env.SMOKE_API_URL ?? '').replace(/\/$/, '');
+// Health checks live at the root; every application route is under /api/v1.
+const v1 = `${api}/api/v1`;
 const web = (process.env.SMOKE_WEB_URL ?? '').replace(/\/$/, '');
 if (!api) {
   console.error('Set SMOKE_API_URL (and optionally SMOKE_WEB_URL).');
@@ -49,16 +51,16 @@ await check('Protected routes refuse anonymous callers (401)', async () => {
     '/audit-logs',
     '/approvals',
   ]) {
-    const r = await get(`${api}${path}`);
+    const r = await get(`${v1}${path}`);
     must(r.status === 401, `${path} returned ${r.status}, expected 401`);
   }
 });
 await check('A forged token is refused (401)', async () => {
-  const r = await get(`${api}/auth/me`, { headers: { authorization: 'Bearer not.a.token' } });
+  const r = await get(`${v1}/auth/me`, { headers: { authorization: 'Bearer not.a.token' } });
   must(r.status === 401, `status ${r.status}`);
 });
 await check('Login rejects bad credentials without revealing which part is wrong', async () => {
-  const r = await get(`${api}/auth/login`, {
+  const r = await get(`${v1}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: 'smoke-nobody@example.invalid', password: 'wrong-password-123' }),
