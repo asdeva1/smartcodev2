@@ -109,6 +109,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @smartcode/e2e install:browsers
       - run: pnpm db:generate && pnpm db:migrate && pnpm db:seed
+      # The API scripts import @smartcode/shared, so everything must be built before the first Manager is created.
+      - run: pnpm build
       - name: Bootstrap the first Manager through the activation workflow (no password exists anywhere)
         shell: bash
         run: |
@@ -118,7 +120,6 @@ jobs:
           BOOTSTRAP_MANAGER_EMAIL: e2e.manager@example.test
           BOOTSTRAP_MANAGER_NAME: E2E Manager
           BOOTSTRAP_MANAGER_EMPLOYEE_ID: MGR-E2E
-      - run: pnpm build
       - name: Run E2E against the built API and web app
         shell: bash
         run: |
