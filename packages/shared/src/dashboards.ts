@@ -1,0 +1,147 @@
+import { z } from 'zod';
+
+/** Dashboards (Phase 11). The Manager sees in-house and vendor work combined, or one vendor / in-house only. */
+
+export const IN_HOUSE_FILTER = 'IN_HOUSE' as const;
+
+export const managerDashboardQuerySchema = z.object({
+  /** A vendor id, or "IN_HOUSE" for work done by SmartClues' own staff. Leave out for everything. */
+  vendorId: z.union([z.uuid(), z.literal(IN_HOUSE_FILTER)]).optional(),
+});
+export type ManagerDashboardQuery = z.infer<typeof managerDashboardQuerySchema>;
+
+export interface ProductionFigures {
+  charts: number;
+  pages: number;
+  icds: number;
+  dos: number;
+}
+
+export interface VendorPerformanceRow {
+  /** null = in-house. */
+  vendorId: string | null;
+  name: string;
+  activeCoders: number;
+  chartsToday: number;
+  chartsMonth: number;
+  pagesMonth: number;
+  cph: number | null;
+  /** Error-based accuracy over this month's audited charts; null until one is audited. */
+  auditPercentage: number | null;
+  completedCharts: number;
+}
+
+export interface ManagerDashboard {
+  asOf: string;
+  timeZone: string;
+  /** The month the production and audit figures cover (YYYY-MM-DD of the first day). */
+  monthFrom: string;
+  filter: { vendorId: string | null; name: string } | null;
+  people: {
+    projects: number;
+    teams: number;
+    activeTeamLeads: number;
+    activeAuditors: number;
+    activeCoders: number;
+  };
+  charts: {
+    total: number;
+    completed: number;
+    pendingAllocation: number;
+    inProgress: number;
+    pendingAudit: number;
+    reviewRequired: number;
+    pendingRework: number;
+    byStatus: Record<string, number>;
+  };
+  audits: { pending: number; completed: number };
+  production: { today: ProductionFigures; month: ProductionFigures };
+  performance: {
+    cph: number | null;
+    activeHours: number;
+    auditPercentage: number | null;
+    auditedCharts: number;
+    totalErrors: number;
+  };
+  vendors: VendorPerformanceRow[];
+}
+
+export interface CoderPerformanceRow {
+  coderId: string;
+  fullName: string;
+  loginName: string | null;
+  chartsToday: number;
+  chartsMonth: number;
+  pagesMonth: number;
+  cph: number | null;
+  auditPercentage: number | null;
+  /** Charts currently with the coder (allocated or in production). */
+  openCharts: number;
+}
+
+/** The Vendor Admin's own vendor: the same figures as the Manager dashboard, limited to that vendor, plus each coder. */
+export interface VendorDashboard extends ManagerDashboard {
+  vendor: { id: string; name: string };
+  coders: CoderPerformanceRow[];
+}
+
+/** A Team Lead's own team(s): totals and a row per coder. */
+export interface TeamLeadDashboard {
+  asOf: string;
+  timeZone: string;
+  monthFrom: string;
+  teams: { id: string; name: string }[];
+  totals: {
+    coders: number;
+    openCharts: number;
+    chartsToday: number;
+    chartsMonth: number;
+    pagesMonth: number;
+    cph: number | null;
+    auditPercentage: number | null;
+    auditedCharts: number;
+    totalErrors: number;
+  };
+  pending: { audit: number; reviewRequired: number; rework: number };
+  coders: CoderPerformanceRow[];
+}
+
+export interface CoachProjectRow {
+  projectId: string;
+  name: string;
+  client: string;
+  auditedCharts: number;
+  auditPercentage: number | null;
+  totalErrors: number;
+  reviewRequired: number;
+  openRework: number;
+}
+
+export interface CoachCoderRow {
+  coderId: string;
+  fullName: string;
+  loginName: string | null;
+  auditedCharts: number;
+  auditPercentage: number | null;
+  auditErrors: number;
+  errorExceptions: number;
+  totalErrors: number;
+}
+
+/** The Quality Coach (SME) view: audit quality across the projects the coach is staffed on. */
+export interface CoachDashboard {
+  asOf: string;
+  timeZone: string;
+  monthFrom: string;
+  totals: {
+    projects: number;
+    auditedCharts: number;
+    auditPercentage: number | null;
+    totalErrors: number;
+    reviewRequired: number;
+    openRework: number;
+  };
+  projects: CoachProjectRow[];
+  /** Lowest accuracy first, so the coder who needs coaching most is at the top. */
+  coders: CoachCoderRow[];
+}

@@ -3,7 +3,7 @@ name: Deploy staging (foundation)
 # Deployment foundation (docs/11-deployment-architecture.md §4). Inert until the staging AWS account exists:
 # it runs only when the repository variable STAGING_DEPLOY_ENABLED is 'true' and uses GitHub OIDC
 # (no stored AWS keys). Order: image → migrate task → db:verify → ECS service → smoke tests.
-# Production deployment (manual approval, same image digest) is added in Phase 13.
+# Production deployment (manual approval, same image digest): deploy-production.yml.
 
 on:
   workflow_dispatch:
@@ -53,5 +53,17 @@ jobs:
           -c env=staging -c imageTag=${{ github.sha }}
           -c certificateArn=${{ vars.STAGING_CERTIFICATE_ARN }}
           -c webUrl=${{ vars.STAGING_WEB_URL }} -c apiUrl=${{ vars.STAGING_API_URL }}
-      # Phase 13: run the migrate task (aws ecs run-task) and db:verify before the service update,
-      # then `pnpm smoke` against STAGING_API_URL / STAGING_WEB_URL. Kept out until the account exists.
+      - name: Run database migrations, then verify the schema
+        env:
+          STACK: SmartCode-Staging-Api
+        run: |
+          out() { aws cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+          node infra/cdk/scripts/run-task.mjs --region "${{ vars.AWS_REGION }}" \
+            --cluster "${{ vars.ECS_CLUSTER_STAGING }}" --task-def "$(out MigrateTaskDefinitionArn)" \
+            --subnets "${{ vars.PRIVATE_SUBNETS_STAGING }}" --security-group "${{ vars.API_SECURITY_GROUP_STAGING }}" \
+            --command "pnpm exec prisma migrate deploy"
+      - name: Smoke test
+        env:
+          SMOKE_API_URL: ${{ vars.STAGING_API_URL }}
+          SMOKE_WEB_URL: ${{ vars.STAGING_WEB_URL }}
+        run: pnpm smoke

@@ -13,6 +13,8 @@ export interface NavItem {
   available: boolean;
   /** Hide when the role only holds the permission for its own records (e.g. a coder's own profile). */
   requiresBroaderThanSelf?: boolean;
+  /** Personal pages (a coder's own charts) are shown to that role only, even though the Manager holds every permission. */
+  onlyRoles?: readonly Role[];
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -30,7 +32,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/vendor',
     permission: 'dashboard.vendor',
     group: 'Overview',
-    available: false,
+    available: true,
+    onlyRoles: ['VENDOR_ADMIN', 'MANAGER'],
   },
   {
     key: 'team-dashboard',
@@ -38,7 +41,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/team-lead',
     permission: 'dashboard.teamLead',
     group: 'Overview',
-    available: false,
+    available: true,
+    onlyRoles: ['TEAM_LEAD'],
   },
   {
     key: 'coach-dashboard',
@@ -46,7 +50,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/sme',
     permission: 'dashboard.groupCoach',
     group: 'Overview',
-    available: false,
+    available: true,
+    onlyRoles: ['GROUP_COACH'],
   },
   {
     key: 'coder-home',
@@ -54,23 +59,25 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/coder',
     permission: 'dashboard.coder',
     group: 'Overview',
-    available: false,
+    available: true,
+    onlyRoles: ['CODER'],
   },
   {
     key: 'auditor-home',
     label: 'Audit queue',
     href: '/auditor',
-    permission: 'dashboard.auditor',
+    permission: 'audit.perform',
     group: 'Overview',
-    available: false,
+    available: true,
+    onlyRoles: ['AUDITOR'],
   },
   {
-    key: 'clients',
-    label: 'Clients & projects',
+    key: 'projects',
+    label: 'Projects',
     href: '/projects',
     permission: 'project.read',
     group: 'Operations',
-    available: false,
+    available: true,
   },
   {
     key: 'charts',
@@ -78,21 +85,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/charts',
     permission: 'chart.read',
     group: 'Operations',
-    available: false,
+    available: true,
   },
   {
     key: 'allocation',
     label: 'Chart allocation',
-    href: '/allocation',
+    href: '/manager/allocation',
     permission: 'chart.allocate',
-    group: 'Operations',
-    available: false,
-  },
-  {
-    key: 'login-names',
-    label: 'Login names',
-    href: '/manager/employees?tab=login-names',
-    permission: 'loginName.assign',
     group: 'Operations',
     available: true,
   },
@@ -102,15 +101,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/audit-reviews',
     permission: 'audit.resolveReview',
     group: 'Quality',
-    available: false,
+    available: true,
   },
   {
     key: 'rework',
     label: 'Rework',
     href: '/rework',
-    permission: 'rework.read',
+    permission: 'rework.perform',
     group: 'Quality',
-    available: false,
+    available: true,
+    onlyRoles: ['CODER'],
   },
   {
     key: 'employees',
@@ -124,18 +124,19 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {
     key: 'vendors',
     label: 'Vendors',
-    href: '/vendors',
-    permission: 'vendor.manage',
+    href: '/manager/vendors',
+    permission: 'vendor.read',
     group: 'People',
-    available: false,
+    available: true,
   },
   {
     key: 'teams',
     label: 'Teams',
-    href: '/teams',
-    permission: 'team.manage',
+    href: '/manager/teams',
+    permission: 'team.read',
     group: 'People',
-    available: false,
+    available: true,
+    requiresBroaderThanSelf: true,
   },
   {
     key: 'reports',
@@ -143,7 +144,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/reports',
     permission: 'report.read',
     group: 'Administration',
-    available: false,
+    available: true,
   },
   {
     key: 'audit-log',
@@ -151,15 +152,56 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/audit-log',
     permission: 'auditLog.read',
     group: 'Administration',
-    available: false,
+    available: true,
+  },
+  {
+    key: 'approvals',
+    label: 'Approvals',
+    href: '/approvals',
+    permission: 'notification.read',
+    group: 'Administration',
+    available: true,
+    onlyRoles: ['MANAGER', 'TEAM_LEAD', 'HR', 'VENDOR_ADMIN', 'GROUP_COACH'],
+  },
+  {
+    key: 'visitors',
+    label: 'Visitors',
+    href: '/visitors',
+    permission: 'visitor.manage',
+    group: 'Operations',
+    available: true,
+  },
+  {
+    key: 'internal-audit',
+    label: 'Internal audit',
+    href: '/internal-audit',
+    permission: 'internalAudit.access',
+    group: 'Quality',
+    available: true,
+  },
+  {
+    key: 'hr-integration',
+    label: 'Smart HRMS',
+    href: '/hr-integration',
+    permission: 'hrIntegration.read',
+    group: 'People',
+    available: true,
+  },
+  {
+    key: 'activity',
+    label: 'Activity',
+    href: '/activity',
+    permission: 'activityLog.read',
+    group: 'Administration',
+    available: true,
   },
   {
     key: 'settings',
     label: 'Settings',
-    href: '/settings',
+    href: '/manager/settings',
     permission: 'settings.manage',
     group: 'Administration',
-    available: false,
+    available: true,
   },
 ];
 
@@ -173,6 +215,7 @@ export const NAV_GROUP_ORDER: readonly NavItem['group'][] = [
 
 export function navigationFor(role: Role): NavItem[] {
   return NAV_ITEMS.filter((item) => {
+    if (item.onlyRoles && !item.onlyRoles.includes(role)) return false;
     const scope = scopeFor(role, item.permission);
     return scope !== null && !(item.requiresBroaderThanSelf && scope === 'SELF');
   });

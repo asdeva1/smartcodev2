@@ -109,15 +109,22 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @smartcode/e2e install:browsers
       - run: pnpm db:generate && pnpm db:migrate && pnpm db:seed
+      # The API scripts import @smartcode/shared, so everything must be built before the first Manager is created.
+      - run: pnpm build
       - name: Bootstrap the first Manager through the activation workflow (no password exists anywhere)
-        run: pnpm bootstrap:manager
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm bootstrap:manager 2>&1 | tee bootstrap.log || { tail -n 15 bootstrap.log | while IFS= read -r l; do echo "::error::${l}"; done; exit 1; }
         env:
           BOOTSTRAP_MANAGER_EMAIL: e2e.manager@example.test
           BOOTSTRAP_MANAGER_NAME: E2E Manager
           BOOTSTRAP_MANAGER_EMPLOYEE_ID: MGR-E2E
-      - run: pnpm build
       - name: Run E2E against the built API and web app
-        run: pnpm test:e2e
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm test:e2e 2>&1 | tee e2e.log || { grep -E 'Error|Expected|Received|✘|failed|Timeout' e2e.log | head -n 20 | while IFS= read -r l; do echo "::error::${l}"; done; exit 1; }
         env:
           E2E_START_SERVERS: '1'
       - uses: actions/upload-artifact@v4

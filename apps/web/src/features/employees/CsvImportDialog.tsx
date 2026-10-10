@@ -32,6 +32,10 @@ export interface CsvImportConfig {
   title: string;
   /** Columns the file must have, shown to the person and used for the downloadable template. */
   columns: readonly string[];
+  /** The columns that must be filled in; the rest are optional. Defaults to every column. */
+  requiredColumns?: readonly string[];
+  /** Optional example line placed under the header in the downloadable template. */
+  templateRow?: string;
   /** Notes on what the file must not contain, and what happens next. */
   guidance: ReactNode;
   previewPath: string;
@@ -73,6 +77,13 @@ export function CsvImportDialog(config: CsvImportConfig) {
     const file = event.target.files?.[0];
     if (!file) return;
     setError(null);
+    if (/\.xlsx?$/i.test(file.name)) {
+      setError(
+        'This is an Excel file. In Excel choose File → Save As → CSV (Comma delimited), then upload that file.',
+      );
+      event.target.value = '';
+      return;
+    }
     setFileName(file.name);
     const text = await file.text();
     setCsv(text);
@@ -108,7 +119,7 @@ export function CsvImportDialog(config: CsvImportConfig) {
     }
   }
 
-  const template = `data:text/csv;charset=utf-8,${encodeURIComponent(`${config.columns.join(',')}\n`)}`;
+  const template = `data:text/csv;charset=utf-8,${encodeURIComponent(`${config.columns.join(',')}\n${config.templateRow ? `${config.templateRow}\n` : ''}`)}`;
   const blocked = Boolean(preview && (preview.fileErrors.length > 0 || preview.valid === 0));
   const allValid = Boolean(
     preview && preview.invalid === 0 && preview.duplicates === 0 && preview.fileErrors.length === 0,
@@ -140,7 +151,13 @@ export function CsvImportDialog(config: CsvImportConfig) {
         {step === 0 && (
           <Box sx={{ display: 'grid', gap: 2 }}>
             <Typography>
-              Required columns: <strong>{config.columns.join(', ')}</strong>.
+              Required columns: <strong>{(config.requiredColumns ?? config.columns).join(', ')}</strong>.
+              {config.requiredColumns && config.requiredColumns.length < config.columns.length && (
+                <>
+                  {' '}
+                  Optional: {config.columns.filter((c) => !config.requiredColumns?.includes(c)).join(', ')}.
+                </>
+              )}
             </Typography>
             <Typography color="text.secondary" component="div">
               {config.guidance}

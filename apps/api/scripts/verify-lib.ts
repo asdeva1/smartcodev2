@@ -38,6 +38,9 @@ export const REQUIRED_TABLES = [
   'notifications',
   'approval_requests',
   'approval_steps',
+  'visitors',
+  'visits',
+  'internal_audit_reviews',
   'activity_logs',
   'audit_logs',
 ] as const;
@@ -58,6 +61,8 @@ export const REQUIRED_ENUMS = [
   'assignment_end_reason',
   'production_status',
   'audit_result',
+  'visit_status',
+  'internal_review_outcome',
   'audit_status',
   'resolution_decision',
   'rework_status',

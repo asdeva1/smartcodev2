@@ -8,19 +8,18 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import Divider from '@mui/material/Divider';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import {
   type EmployeeRecord,
+  type EmployeeTimelineEntry,
   ROLES,
   ROLE_LABELS,
   type Role,
   employeeCreateSchema,
   isLoginNameEligibleRole,
-  loginNameSchema,
 } from '@smartcode/shared';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
@@ -246,41 +245,73 @@ export function AddEmployeeDialog({
 
 // ───────── View / edit ─────────
 
-interface HistoryRow {
-  loginName: string;
-  assignedAt: string;
-  endedAt: string | null;
-  endReason: string | null;
-  assignedBy: string;
+const ACTION_LABELS: Record<string, string> = {
+  'EMPLOYEE.CREATED': 'Account created',
+  'EMPLOYEE.UPDATED': 'Details changed',
+  'EMPLOYEE.ACTIVATION_SENT': 'Activation link sent',
+  'EMPLOYEE.DEACTIVATED': 'Deactivated',
+  'EMPLOYEE.REACTIVATED': 'Reactivated',
+  'EMPLOYEE.ROLE_CHANGED': 'Role changed',
+  'EMPLOYEE.PASSWORD_RESET_TRIGGERED': 'Password reset link sent',
+  'EMPLOYEE.ACTIVATED': 'Account activated',
+  'EMPLOYEE.IMPORTED': 'Imported from a file',
+};
+const actionLabel = (a: string) =>
+  ACTION_LABELS[a] ??
+  a
+    .replace(/^EMPLOYEE\./, '')
+    .toLowerCase()
+    .replaceAll('_', ' ');
+
+function EmployeeTimeline({ employeeId }: { employeeId: string }) {
+  const [entries, setEntries] = useState<EmployeeTimelineEntry[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    apiFetch<EmployeeTimelineEntry[]>(`/employees/${employeeId}/timeline`)
+      .then((d) => live && setEntries(d))
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [employeeId]);
+  return (
+    <Box>
+      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+        History
+      </Typography>
+      {failed && <Typography color="text.secondary">The history could not be loaded.</Typography>}
+      {entries && entries.length === 0 && <Typography color="text.secondary">No history yet.</Typography>}
+      {entries && entries.length > 0 && (
+        <Box component="ul" sx={{ m: 0, pl: 2.5, maxHeight: 220, overflow: 'auto' }}>
+          {entries.map((e) => (
+            <li key={e.id}>
+              <Typography variant="body2">
+                {actionLabel(e.action)}
+                {e.actor ? ` by ${e.actor.fullName}` : ''} ·{' '}
+                {new Date(e.at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+              </Typography>
+            </li>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
 }
 
 export function EmployeeDetailDialog({
   employee,
   canEdit,
-  canSeeLoginNames,
   onClose,
 }: {
   employee: EmployeeRecord;
   canEdit: boolean;
-  canSeeLoginNames: boolean;
   onClose: (changed: boolean) => void;
 }) {
   const pending = employee.status === 'PENDING_ACTIVATION';
   const [name, setName] = useState(employee.fullName);
   const [email, setEmail] = useState(employee.email);
-  const [history, setHistory] = useState<HistoryRow[] | null>(null);
   const action = useAction(() => onClose(true));
-
-  useEffect(() => {
-    if (!canSeeLoginNames || !isLoginNameEligibleRole(employee.role)) return;
-    let live = true;
-    apiFetch<HistoryRow[]>(`/employees/${employee.id}/login-names`)
-      .then((h) => live && setHistory(h))
-      .catch(() => live && setHistory([]));
-    return () => {
-      live = false;
-    };
-  }, [employee.id, employee.role, canSeeLoginNames]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -301,11 +332,6 @@ export function EmployeeDetailDialog({
     ['Team', employee.team?.name ?? '—'],
     ['Team Lead', employee.teamLead?.fullName ?? '—'],
     ['Projects', employee.projects.length ? employee.projects.map((p) => p.name).join(', ') : '—'],
-    [
-      'Login Name',
-      employee.loginName ??
-        (isLoginNameEligibleRole(employee.role) ? 'Not assigned' : 'Not used for this role'),
-    ],
     ['Created', formatDate(employee.createdAt)],
     ['Activated', formatDate(employee.activatedAt)],
   ];
@@ -352,22 +378,7 @@ export function EmployeeDetailDialog({
           </Box>
         ))}
       </Box>
-      {history && history.length > 0 && (
-        <>
-          <Divider />
-          <Typography variant="h6" component="h3">
-            Login Name history
-          </Typography>
-          {history.map((h) => (
-            <Typography key={`${h.loginName}-${h.assignedAt}`} variant="body2">
-              <strong>{h.loginName}</strong> · {formatDate(h.assignedAt)} –{' '}
-              {h.endedAt ? formatDate(h.endedAt) : 'now'}
-              {h.endReason ? ` (${h.endReason.toLowerCase().replaceAll('_', ' ')})` : ''} · assigned by{' '}
-              {h.assignedBy}
-            </Typography>
-          ))}
-        </>
-      )}
+      <EmployeeTimeline employeeId={employee.id} />
     </FormDialog>
   );
 }
@@ -504,65 +515,6 @@ export function DeactivateDialog({
           label="I understand they still hold open work"
         />
       )}
-    </FormDialog>
-  );
-}
-
-// ───────── Assign / change Login Name ─────────
-
-export function LoginNameDialog({
-  employee,
-  onClose,
-}: {
-  employee: EmployeeRecord;
-  onClose: (changed: boolean) => void;
-}) {
-  const [value, setValue] = useState(employee.loginName ?? '');
-  const [fieldError, setFieldError] = useState<string | null>(null);
-  const action = useAction(() => onClose(true));
-  const changing = employee.loginName !== null;
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    const parsed = loginNameSchema.safeParse(value);
-    if (!parsed.success) return setFieldError(parsed.error.issues[0]?.message ?? 'Enter a valid Login Name');
-    if (parsed.data === employee.loginName) return setFieldError('That is already their Login Name.');
-    setFieldError(null);
-    void action.run(() =>
-      apiFetch('/login-names/assignments', {
-        method: 'POST',
-        body: JSON.stringify({ employeeId: employee.id, loginName: parsed.data }),
-      }),
-    );
-  }
-
-  return (
-    <FormDialog
-      title={`${changing ? 'Change' : 'Assign'} Login Name`}
-      onClose={() => onClose(false)}
-      onSubmit={submit}
-      submitLabel={changing ? 'Change Login Name' : 'Assign Login Name'}
-      busy={action.busy}
-      error={action.error}
-    >
-      <Typography variant="body2" color="text.secondary">
-        {employee.fullName} · {employee.email} · {ROLE_LABELS[employee.role]}. The Login Name identifies their
-        work in SmartClues; they still sign in to SmartCode with email and password.
-      </Typography>
-      {changing && (
-        <Alert severity="info">
-          The current Login Name ({employee.loginName}) is ended and kept in the history.
-        </Alert>
-      )}
-      <TextField
-        label="SmartClues Login Name"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        error={Boolean(fieldError)}
-        helperText={fieldError}
-        autoFocus
-        required
-      />
     </FormDialog>
   );
 }

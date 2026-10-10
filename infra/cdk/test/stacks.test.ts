@@ -121,12 +121,12 @@ describe('production', () => {
     t.api.resourceCountIs('AWS::WAFv2::WebACLAssociation', 1);
   });
 
-  it('ECR images are scanned and immutable; a migration task exists', () => {
+  it('ECR images are scanned and immutable; migration and bootstrap tasks exist', () => {
     t.api.hasResourceProperties('AWS::ECR::Repository', {
       ImageScanningConfiguration: { ScanOnPush: true },
       ImageTagMutability: 'IMMUTABLE',
     });
-    t.api.resourceCountIs('AWS::ECS::TaskDefinition', 2);
+    t.api.resourceCountIs('AWS::ECS::TaskDefinition', 3);
   });
 
   it('VPC flow logs and alarms exist', () => {
@@ -163,6 +163,22 @@ describe('staging', () => {
     });
     t.api.hasResourceProperties('AWS::ECS::Service', { DesiredCount: 1 });
     Annotations.fromStack(t.stacks.api).hasWarning('*', Match.stringLikeRegexp('HTTP only'));
+  });
+
+  it('allows a shorter backup retention for free-plan accounts, but never in production', () => {
+    const app = new App();
+    const { data } = buildApp(app, { env: 'staging', imageTag: 'test', backupRetentionDays: 1 });
+    Template.fromStack(data).hasResourceProperties('AWS::RDS::DBInstance', { BackupRetentionPeriod: 1 });
+    expect(() => buildApp(new App(), { env: 'production', backupRetentionDays: 1 })).toThrow(/production/);
+  });
+
+  it('can put an https API Gateway front door in front of the ALB (staging stop-gap), never production', () => {
+    const { api } = buildApp(new App(), { env: 'staging', imageTag: 'test', httpsApiGateway: true });
+    const template = Template.fromStack(api);
+    template.resourceCountIs('AWS::ApiGatewayV2::Api', 1);
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', { RouteKey: 'ANY /{proxy+}' });
+    const prod = buildApp(new App(), { env: 'production', imageTag: 'test', httpsApiGateway: true });
+    Annotations.fromStack(prod.api).hasError('*', Match.stringLikeRegexp('stop-gap'));
   });
 
   it('rejects unknown environments', () => {

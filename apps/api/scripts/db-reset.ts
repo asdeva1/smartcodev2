@@ -17,6 +17,6 @@ if (!['development', 'test'].includes(env) || !isLocalDatabase(url)) {
 
 console.log(`Resetting local database ${describeDatabase(url)} …`);
 const run = (args: string[]) => execFileSync('pnpm', args, { stdio: 'inherit', env: process.env });
-run(['exec', 'prisma', 'migrate', 'reset', '--force', '--skip-seed']);
+run(['exec', 'prisma', 'migrate', 'reset', '--force']);
 run(['exec', 'tsx', 'scripts/db-seed.ts']);
 console.log('Local database reset complete.');

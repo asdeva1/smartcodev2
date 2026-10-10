@@ -18,6 +18,8 @@
     "test:api": "turbo run test --filter=@smartcode/api",
     "test:web": "turbo run test --filter=@smartcode/web",
     "test:e2e": "pnpm --filter @smartcode/e2e e2e",
+    "smoke": "node scripts/smoke.mjs",
+    "loadtest": "node scripts/loadtest.mjs",
     "secrets:check": "node scripts/check-secrets.mjs",
     "env:check": "node scripts/check-env.mjs",
     "db:generate": "pnpm --filter @smartcode/api db:generate",
@@ -49,6 +51,11 @@
       "sharp",
       "unrs-resolver",
       "@swc/core"
-    ]
+    ],
+    "overrides": {
+      "uuid": "^11.1.1",
+      "mysql2": "^3.23.1",
+      "deepmerge-ts": "^8.0.0"
+    }
   }
 }

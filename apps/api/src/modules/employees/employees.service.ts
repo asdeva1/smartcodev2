@@ -3,6 +3,7 @@ import {
   type EmployeeCreate,
   type EmployeeListQuery,
   type EmployeeRecord,
+  type EmployeeTimelineEntry,
   type EmployeeUpdate,
   type Page,
   type Permission,
@@ -59,7 +60,7 @@ export class EmployeesService {
     return scope;
   }
 
-  async list(principal: Principal, query: EmployeeListQuery): Promise<Page<EmployeeRecord>> {
+  private listWhere(principal: Principal, query: EmployeeListQuery): Prisma.EmployeeWhereInput {
     const scope = this.scopeOf(principal, 'employee.read');
     const filters: Prisma.EmployeeWhereInput[] = [employeeScopeWhere(principal, scope)];
     if (query.role) filters.push({ role: query.role });
@@ -86,7 +87,11 @@ export class EmployeesService {
         ],
       });
     }
-    const where: Prisma.EmployeeWhereInput = { AND: filters };
+    return { AND: filters };
+  }
+
+  async list(principal: Principal, query: EmployeeListQuery): Promise<Page<EmployeeRecord>> {
+    const where = this.listWhere(principal, query);
     const [total, rows] = await this.prisma.client.$transaction([
       this.prisma.client.employee.count({ where }),
       this.prisma.client.employee.findMany({
@@ -98,6 +103,82 @@ export class EmployeesService {
       }),
     ]);
     return { items: rows.map(toEmployeeRecord), page: query.page, pageSize: query.pageSize, total };
+  }
+
+  /** The directory as CSV: the same filters and scope as the list, up to 10,000 rows. Formula-looking cells are neutralised. */
+  async exportCsv(
+    principal: Principal,
+    query: EmployeeListQuery,
+  ): Promise<{ filename: string; body: Buffer }> {
+    const rows = await this.prisma.client.employee.findMany({
+      where: this.listWhere(principal, query),
+      include: EMPLOYEE_INCLUDE,
+      orderBy: [{ [query.sort]: query.direction }, { id: 'asc' }],
+      take: 10_000,
+    });
+    const cell = (v: string | null | undefined) => {
+      const t = (v ?? '').replace(/\r?\n/g, ' ');
+      const safe = /^[=+\-@\t]/.test(t) ? `'${t}` : t;
+      return /[",]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+    };
+    const day = (iso: string | null) => (iso ? iso.slice(0, 10) : '');
+    const header = [
+      'Employee ID',
+      'Name',
+      'Email',
+      'Role',
+      'Team',
+      'Team Lead',
+      'Projects',
+      'Vendor',
+      'Status',
+      'Login Name',
+      'Created',
+      'Activated',
+    ];
+    const lines = rows.map((r) => {
+      const e = toEmployeeRecord(r);
+      return [
+        e.employeeCode,
+        e.fullName,
+        e.email,
+        e.role,
+        e.team?.name,
+        e.teamLead?.fullName,
+        e.projects.map((p) => p.name).join('; '),
+        e.vendor?.name ?? 'In-house',
+        e.status,
+        e.loginName,
+        day(e.createdAt),
+        day(e.activatedAt),
+      ]
+        .map(cell)
+        .join(',');
+    });
+    return {
+      filename: `employees_${new Date().toISOString().slice(0, 10)}.csv`,
+      body: Buffer.from('\uFEFF' + [header.join(','), ...lines].join('\r\n'), 'utf8'),
+    };
+  }
+
+  /** The person's history from the audit trail, newest first. Visible to whoever may read the employee. */
+  async timeline(principal: Principal, id: string): Promise<EmployeeTimelineEntry[]> {
+    await this.loadVisible(principal, id, 'employee.read');
+    const rows = await this.prisma.client.auditLog.findMany({
+      where: { organizationId: principal.organizationId, entityType: 'Employee', entityId: id },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 100,
+      include: { actor: { select: { id: true, fullName: true } } },
+    });
+    const obj = (v: unknown) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null);
+    return rows.map((r) => ({
+      id: r.id,
+      action: r.action,
+      actor: r.actor,
+      before: obj(r.beforeData),
+      after: obj(r.afterData),
+      at: r.createdAt.toISOString(),
+    }));
   }
 
   /**

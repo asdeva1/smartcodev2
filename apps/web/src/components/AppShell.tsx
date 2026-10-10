@@ -20,6 +20,7 @@ import { groupedNavigation } from '@/features/navigation/navigation';
 import { tokens } from '@/theme/tokens';
 import { BrandLogo } from './BrandLogo';
 import { EnvironmentBadge } from './EnvironmentBadge';
+import { NotificationBell } from './NotificationBell';
 
 export interface AppShellProps {
   role: Role;
@@ -148,9 +149,40 @@ export function AppShell({ role, title, currentPath, appEnv, userName, onSignOut
               {title}
             </Typography>
             <EnvironmentBadge appEnv={appEnv} />
-            <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
-              {userName ? `${userName} · ${ROLE_LABELS[role]}` : ROLE_LABELS[role]}
-            </Typography>
+            {userName && <NotificationBell />}
+            {userName ? (
+              <Tooltip title="Open My account">
+                <Button
+                  component={NextLink}
+                  href="/my-account"
+                  size="small"
+                  color="inherit"
+                  aria-label="My account"
+                  aria-current={currentPath === '/my-account' ? 'page' : undefined}
+                  sx={{ display: { xs: 'none', sm: 'inline-flex' }, textTransform: 'none', fontWeight: 500 }}
+                >
+                  {`${userName} · ${ROLE_LABELS[role]}`}
+                </Button>
+              </Tooltip>
+            ) : (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ display: { xs: 'none', sm: 'block' } }}
+              >
+                {ROLE_LABELS[role]}
+              </Typography>
+            )}
+            {userName && (
+              <Button
+                component={NextLink}
+                href="/my-account"
+                size="small"
+                sx={{ display: { xs: 'inline-flex', sm: 'none' }, textTransform: 'none' }}
+              >
+                My account
+              </Button>
+            )}
             {onSignOut && (
               <Button size="small" variant="outlined" onClick={onSignOut}>
                 Sign out

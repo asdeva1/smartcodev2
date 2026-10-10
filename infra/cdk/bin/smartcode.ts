@@ -12,4 +12,10 @@ buildApp(app, {
   webUrl: ctx('webUrl'),
   apiUrl: ctx('apiUrl'),
   appUrl: ctx('appUrl'),
+  mailFrom: ctx('mailFrom'),
+  cookieDomain: ctx('cookieDomain'),
+  backupRetentionDays:
+    ctx('backupRetentionDays') === undefined ? undefined : Number(ctx('backupRetentionDays')),
+  httpsApiGateway: String(ctx('httpsApiGateway')) === 'true',
+  desiredCount: ctx('desiredCount') === undefined ? undefined : Number(ctx('desiredCount')),
 });

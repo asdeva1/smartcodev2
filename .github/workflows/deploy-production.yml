@@ -1,0 +1,115 @@
+name: Deploy production
+
+# Promotes an image that already passed on staging. Nothing is rebuilt: the same image (same digest) is copied
+# from the staging registry to the production registry. The `production` GitHub environment must have required
+# reviewers, which is the manual approval gate. Inert until PRODUCTION_DEPLOY_ENABLED is 'true'.
+# Procedure and rollback: docs/runbooks/deploy.md and docs/runbooks/rollback.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image tag already deployed and smoke-tested on staging (the commit SHA)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Copy the approved image to production
+    if: vars.PRODUCTION_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      digest: ${{ steps.copy.outputs.digest }}
+    steps:
+      - name: Read from staging registry
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_STAGING }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr-staging
+      - name: Pull the staging images
+        run: |
+          SRC="${{ steps.ecr-staging.outputs.registry }}/${{ vars.ECR_REPOSITORY_STAGING }}"
+          docker pull "$SRC:${{ inputs.image_tag }}"
+          docker pull "$SRC:${{ inputs.image_tag }}-migrator"
+      - name: Write to production registry
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_PRODUCTION }}
+          aws-region: ${{ vars.AWS_REGION_PRODUCTION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr-prod
+      - id: copy
+        run: |
+          SRC="${{ steps.ecr-staging.outputs.registry }}/${{ vars.ECR_REPOSITORY_STAGING }}"
+          DST="${{ steps.ecr-prod.outputs.registry }}/${{ vars.ECR_REPOSITORY_PRODUCTION }}"
+          for suffix in "" "-migrator"; do
+            docker tag "$SRC:${{ inputs.image_tag }}$suffix" "$DST:${{ inputs.image_tag }}$suffix"
+            docker push "$DST:${{ inputs.image_tag }}$suffix"
+          done
+          echo "digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$DST:${{ inputs.image_tag }}" | cut -d@ -f2)" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Migrate, deploy, smoke test
+    needs: promote
+    runs-on: ubuntu-latest
+    environment: production # required reviewers = manual approval
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.image_tag }}
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_PRODUCTION }}
+          aws-region: ${{ vars.AWS_REGION_PRODUCTION }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Snapshot the database before changing anything
+        run: |
+          aws rds create-db-snapshot --db-instance-identifier "${{ vars.RDS_INSTANCE_PRODUCTION }}" \
+            --db-snapshot-identifier "pre-deploy-${{ inputs.image_tag }}-${{ github.run_id }}"
+          aws rds wait db-snapshot-available --db-snapshot-identifier "pre-deploy-${{ inputs.image_tag }}-${{ github.run_id }}"
+      - name: Review the infrastructure change
+        working-directory: infra/cdk
+        run: >-
+          pnpm exec cdk diff SmartCode-Prod-Api --exclusively
+          -c env=production -c imageTag=${{ inputs.image_tag }}
+          -c certificateArn=${{ vars.PRODUCTION_CERTIFICATE_ARN }}
+          -c webUrl=${{ vars.PRODUCTION_WEB_URL }} -c apiUrl=${{ vars.PRODUCTION_API_URL }}
+          -c appUrl=${{ vars.PRODUCTION_WEB_URL }} -c mailFrom=${{ vars.PRODUCTION_MAIL_FROM }}
+        continue-on-error: true
+      - name: Deploy API stack
+        working-directory: infra/cdk
+        run: >-
+          pnpm exec cdk deploy SmartCode-Prod-Api --exclusively --require-approval never
+          -c env=production -c imageTag=${{ inputs.image_tag }}
+          -c certificateArn=${{ vars.PRODUCTION_CERTIFICATE_ARN }}
+          -c webUrl=${{ vars.PRODUCTION_WEB_URL }} -c apiUrl=${{ vars.PRODUCTION_API_URL }}
+          -c appUrl=${{ vars.PRODUCTION_WEB_URL }} -c mailFrom=${{ vars.PRODUCTION_MAIL_FROM }}
+      - name: Run database migrations
+        run: |
+          out() { aws cloudformation describe-stacks --stack-name SmartCode-Prod-Api --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+          node infra/cdk/scripts/run-task.mjs --region "${{ vars.AWS_REGION_PRODUCTION }}" \
+            --cluster "${{ vars.ECS_CLUSTER_PRODUCTION }}" --task-def "$(out MigrateTaskDefinitionArn)" \
+            --subnets "${{ vars.PRIVATE_SUBNETS_PRODUCTION }}" --security-group "${{ vars.API_SECURITY_GROUP_PRODUCTION }}" \
+            --command "pnpm exec prisma migrate deploy"
+      - name: Smoke test production
+        env:
+          SMOKE_API_URL: ${{ vars.PRODUCTION_API_URL }}
+          SMOKE_WEB_URL: ${{ vars.PRODUCTION_WEB_URL }}
+        run: pnpm smoke

@@ -36,9 +36,29 @@ export function useSession(): SessionValue {
   return value;
 }
 
-/** Where each role lands after signing in. Only the Manager workspace exists in Phase 3. */
+/**
+ * Where each role lands after signing in. Role dashboards arrive in Phase 11; until then every role lands on the
+ * first screen it can actually use instead of the public home page.
+ */
 export function homeFor(role: Role): string {
-  return role === 'MANAGER' ? '/manager' : '/';
+  switch (role) {
+    case 'MANAGER':
+      return '/manager';
+    case 'CODER':
+      return '/coder';
+    case 'AUDITOR':
+      return '/auditor';
+    case 'TEAM_LEAD':
+      return '/team-lead';
+    case 'GROUP_COACH':
+      return '/sme';
+    case 'VENDOR_ADMIN':
+      return '/vendor';
+    case 'HR':
+      return '/manager/employees';
+    default:
+      return '/';
+  }
 }
 
 /**

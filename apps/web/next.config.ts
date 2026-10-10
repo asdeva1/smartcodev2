@@ -39,6 +39,15 @@ const config: NextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
+  /**
+   * Optional same-origin API proxy (deployment configuration, no business logic). When API_PROXY_TARGET is set the
+   * browser talks only to this site and Next.js forwards /api/v1/* to the API. Used while the web app and the API
+   * have no common parent domain, so the session cookies stay first-party. Unset locally and in production.
+   */
+  async rewrites() {
+    const target = process.env.API_PROXY_TARGET?.trim().replace(/\/+$/, '');
+    return target ? [{ source: '/api/v1/:path*', destination: `${target}/api/v1/:path*` }] : [];
+  },
 };
 
 export default config;

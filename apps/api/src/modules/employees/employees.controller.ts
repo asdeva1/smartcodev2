@@ -1,4 +1,16 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+  StreamableFile,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import {
   type BulkActivation,
   type CsvCommit,
@@ -43,6 +55,23 @@ export class EmployeesController {
     @Query(new ZodValidationPipe(employeeListQuerySchema)) q: EmployeeListQuery,
   ) {
     return this.employees.list(p, q);
+  }
+
+  /** The directory as a CSV file, with the same filters as the list. Static path — before `:id`. */
+  @Get('export')
+  @RequirePermission('employee.read')
+  async export(
+    @CurrentPrincipal() p: Principal,
+    @Query(new ZodValidationPipe(employeeListQuerySchema)) q: EmployeeListQuery,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const file = await this.employees.exportCsv(p, q);
+    res.set({
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${file.filename}"`,
+      'Cache-Control': 'no-store',
+    });
+    return new StreamableFile(file.body);
   }
 
   /** Filter and form choices (vendors, teams, projects) within the caller's scope. Static path — before `:id`. */
@@ -97,6 +126,12 @@ export class EmployeesController {
   }
 
   // ───── one employee ─────
+
+  @Get(':id/timeline')
+  @RequirePermission('employee.read')
+  timeline(@CurrentPrincipal() p: Principal, @Param('id', new UuidParamPipe()) id: string) {
+    return this.employees.timeline(p, id);
+  }
 
   @Get(':id')
   @RequirePermission('employee.read')

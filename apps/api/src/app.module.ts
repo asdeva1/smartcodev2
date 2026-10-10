@@ -10,9 +10,23 @@ import { MailModule } from './core/mail/mail.module';
 import { LoggingModule } from './core/logging/logging.module';
 import { PrismaModule } from './core/prisma/prisma.module';
 import { HealthController } from './modules/health/health.controller';
+import { AllocationModule } from './modules/allocation/allocation.module';
 import { AuthApiModule } from './modules/auth/auth.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { MetaController } from './modules/meta/meta.controller';
+import { OrganizationModule } from './modules/organization/organization.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { DashboardsModule } from './modules/dashboards/dashboards.module';
+import { LogsModule } from './modules/logs/logs.module';
+import { ApprovalsModule } from './modules/approvals/approvals.module';
+import { InternalAuditModule } from './modules/internal-audit/internal-audit.module';
+import { VisitorsModule } from './modules/visitors/visitors.module';
+import { HrIntegrationModule } from './modules/hr-integration/hr-integration.module';
+import { ProductionModule } from './modules/production/production.module';
+import { AuditsModule } from './modules/audits/audits.module';
+import { ProjectsModule } from './modules/projects/projects.module';
+import { TeamsModule } from './modules/teams/teams.module';
+import { VendorsModule } from './modules/vendors/vendors.module';
 
 /**
  * Root module. Business modules are registered here phase by phase (docs/14-implementation-roadmap.md).
@@ -37,6 +51,20 @@ export class AppModule {
         AuthModule,
         AuthApiModule,
         EmployeesModule,
+        OrganizationModule,
+        VendorsModule,
+        TeamsModule,
+        AllocationModule,
+        ProjectsModule,
+        ProductionModule,
+        NotificationsModule,
+        DashboardsModule,
+        LogsModule,
+        ApprovalsModule,
+        HrIntegrationModule,
+        VisitorsModule,
+        InternalAuditModule,
+        AuditsModule,
       ],
       controllers: [HealthController, MetaController],
       providers: [

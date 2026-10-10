@@ -19,8 +19,8 @@ function problem(status: number, code: string) {
 }
 
 describe('navigation from the shared permission matrix', () => {
-  it('only Manager sees allocation, login names and audit reviews', () => {
-    for (const key of ['allocation', 'login-names', 'reviews']) {
+  it('only Manager sees chart allocation and audit reviews', () => {
+    for (const key of ['allocation', 'reviews']) {
       const holders = ROLES.filter((r) => navigationFor(r).some((i) => i.key === key));
       expect([key, holders]).toEqual([key, ['MANAGER']]);
     }

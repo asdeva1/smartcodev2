@@ -49,6 +49,7 @@ export const PERMISSIONS = [
   'system.admin',
   'visitor.manage',
   'internalAudit.access',
+  'hrIntegration.read',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -82,6 +83,7 @@ export const RBAC_MATRIX: Readonly<Record<Role, Grants>> = {
     'activityLog.read': 'ORG',
     'notification.read': 'SELF',
     'visitor.manage': 'ORG',
+    'hrIntegration.read': 'ORG',
   },
   GROUP_COACH: {
     'employee.read': 'PROJECT',
