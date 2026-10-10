@@ -47,18 +47,13 @@ function useDashboard<T>(path: string) {
   return { data, error };
 }
 
-function Dashboard() {
-  const { profile, signOut } = useSession();
-  const { data, error } = useDashboard<TeamLeadDashboard>('/dashboards/team-lead');
+/** The team's figures. A Team Lead sees the teams they lead; a Manager passes the team to open. */
+export function TeamDashboardPanel({ teamId }: { teamId?: string }) {
+  const { data, error } = useDashboard<TeamLeadDashboard>(
+    teamId ? `/dashboards/team-lead?teamId=${teamId}` : '/dashboards/team-lead',
+  );
   return (
-    <AppShell
-      role="TEAM_LEAD"
-      title="My team"
-      currentPath="/team-lead"
-      appEnv={env.NEXT_PUBLIC_APP_ENV}
-      userName={profile.employee.fullName}
-      onSignOut={() => void signOut()}
-    >
+    <>
       <Box sx={{ display: 'grid', gap: 3.5, maxWidth: 1200 }}>
         {error && <Alert severity="error">{error}</Alert>}
         {data && data.teams.length === 0 && (
@@ -142,6 +137,22 @@ function Dashboard() {
           </>
         )}
       </Box>
+    </>
+  );
+}
+
+function Dashboard() {
+  const { profile, signOut } = useSession();
+  return (
+    <AppShell
+      role="TEAM_LEAD"
+      title="My team"
+      currentPath="/team-lead"
+      appEnv={env.NEXT_PUBLIC_APP_ENV}
+      userName={profile.employee.fullName}
+      onSignOut={() => void signOut()}
+    >
+      <TeamDashboardPanel />
     </AppShell>
   );
 }

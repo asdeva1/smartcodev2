@@ -260,6 +260,7 @@ model Employee {
   loginNamesCreated      LoginName[]
   projectAssignments     ProjectAssignment[]   @relation("ProjectAssignmentEmployee")
   projectAssignedBy      ProjectAssignment[]   @relation("ProjectAssignmentAssignedBy")
+  projectsTeamAssigned   Project[]             @relation("ProjectTeamAssignedBy")
   chartsCreated          Chart[]
   chartsSubmittedToClient Chart[]              @relation("ChartSubmittedToClientBy")
   chartStatusEvents      ChartStatusEvent[]
@@ -387,6 +388,8 @@ model Team {
   vendor       Vendor?          @relation(fields: [organizationId, vendorId], references: [organizationId, id], onDelete: Restrict)
   teamLead     Employee?        @relation("TeamLead", fields: [teamLeadId], references: [id], onDelete: Restrict)
   memberships  TeamMembership[]
+  projects     Project[]        @relation("ProjectTeam")
+  derivedAssignments ProjectAssignment[] @relation("ProjectAssignmentTeam")
 
   @@index([organizationId, status])
   @@index([vendorId, status])
@@ -490,10 +493,16 @@ model Project {
   vendorId       String?        @map("vendor_id") @db.Uuid
   /// Last time the client pulled the project's charts back (all open allocations were ended).
   clientPullbackAt DateTime?  @map("client_pullback_at") @db.Timestamptz(3)
+  /// The one team that works this project. Its Team Lead, Coders and Group Coaches become the project's staff.
+  teamId         String?        @map("team_id") @db.Uuid
+  /// The Manager who last assigned the team (recorded as the assigner of the team-derived staff rows).
+  teamAssignedById String?      @map("team_assigned_by_id") @db.Uuid
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  team         Team?               @relation("ProjectTeam", fields: [teamId], references: [id], onDelete: Restrict)
+  teamAssignedBy Employee?         @relation("ProjectTeamAssignedBy", fields: [teamAssignedById], references: [id], onDelete: Restrict)
   client       Client              @relation(fields: [organizationId, clientId], references: [organizationId, id], onDelete: Restrict)
   vendor       Vendor?             @relation(fields: [organizationId, vendorId], references: [organizationId, id], onDelete: Restrict)
   assignments  ProjectAssignment[]
@@ -503,6 +512,8 @@ model Project {
   @@index([clientId])
   @@index([vendorId, status])
   @@index([organizationId, status])
+  @@index([teamId])
+  @@index([teamAssignedById])
   @@map("projects")
 }
 
@@ -514,10 +525,13 @@ model ProjectAssignment {
   employeeId   String      @map("employee_id") @db.Uuid
   projectRole  ProjectRole @map("project_role")
   assignedById String      @map("assigned_by_id") @db.Uuid
+  /// Set when the row was created from the project's team; NULL for rows a Manager added by hand.
+  viaTeamId    String?     @map("via_team_id") @db.Uuid
   startedAt    DateTime    @default(now()) @map("started_at") @db.Timestamptz(3)
   endedAt      DateTime?   @map("ended_at") @db.Timestamptz(3)
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
 
+  viaTeam    Team?    @relation("ProjectAssignmentTeam", fields: [viaTeamId], references: [id], onDelete: Restrict)
   project    Project  @relation(fields: [projectId], references: [id], onDelete: Restrict)
   employee   Employee @relation("ProjectAssignmentEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
   assignedBy Employee @relation("ProjectAssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
@@ -525,6 +539,7 @@ model ProjectAssignment {
   @@index([projectId])
   @@index([employeeId])
   @@index([assignedById])
+  @@index([viaTeamId])
   @@map("project_assignments")
 }
 

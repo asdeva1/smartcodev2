@@ -22,10 +22,12 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import type { Prisma } from '../../generated/prisma/client';
 import { logEntityChange } from '../organization/entity-log';
 import { projectScopeWhere } from './project-scope';
+import { syncProjectTeamStaff } from './project-team-sync';
 
 const LIST_INCLUDE = {
   client: { select: { id: true, name: true } },
   vendor: { select: { id: true, name: true } },
+  team: { select: { id: true, name: true } },
   assignments: {
     where: { endedAt: null },
     select: { projectRole: true, startedAt: true, employee: { select: { id: true, fullName: true } } },
@@ -49,6 +51,7 @@ function toListRecord(p: ProjectRow): ProjectListRecord {
     allocationType: p.allocationType,
     status: p.status,
     vendor: p.vendor,
+    team: p.team,
     lead: lead ? { id: lead.employee.id, fullName: lead.employee.fullName } : null,
     memberCount: p.assignments.filter((a) => a.projectRole !== 'TEAM_LEAD').length,
     chartCount: p._count.charts,
@@ -146,6 +149,7 @@ export class ProjectsService {
         orderBy: { startedAt: 'asc' },
         select: {
           projectRole: true,
+          viaTeamId: true,
           startedAt: true,
           employee: {
             select: {
@@ -184,6 +188,7 @@ export class ProjectsService {
         fullName: s.employee.fullName,
         email: s.employee.email,
         projectRole: s.projectRole,
+        viaTeam: s.viaTeamId !== null,
         loginName: s.employee.loginNameAssignments[0]?.loginName.value ?? null,
         openCharts: openByEmployee.get(s.employee.id) ?? 0,
         startedAt: s.startedAt.toISOString(),
@@ -195,6 +200,7 @@ export class ProjectsService {
       chartsByStatus: Object.fromEntries(byStatus.map((b) => [b.status, b._count._all])),
       submittedToClient: submitted,
       clientPullbackAt: meta.clientPullbackAt?.toISOString() ?? null,
+      legacyStaffCount: staff.filter((s) => s.viaTeamId === null && s.projectRole !== 'AUDITOR').length,
     };
   }
 
@@ -264,9 +270,14 @@ export class ProjectsService {
 
   async create(principal: Principal, input: ProjectCreate, meta: RequestMeta): Promise<ProjectDetail> {
     const organizationId = principal.organizationId;
-    if (input.vendorId) {
+    let vendorId = input.vendorId ?? null;
+    if (input.teamId) {
+      const team = await this.assertTeamUsable(organizationId, input.teamId, vendorId, !input.vendorId);
+      vendorId = team.vendorId;
+    }
+    if (vendorId) {
       const vendor = await this.prisma.client.vendor.findFirst({
-        where: { id: input.vendorId, organizationId },
+        where: { id: vendorId, organizationId },
         select: { status: true },
       });
       if (!vendor) throw new ProblemException(404, 'NOT_FOUND', 'Vendor not found');
@@ -274,7 +285,7 @@ export class ProjectsService {
         throw new ProblemException(409, 'CONFLICT', 'This vendor is inactive and cannot receive a project');
       }
     }
-    if (input.leadId) await this.assertLeadEligible(organizationId, input.leadId, input.vendorId ?? null);
+    if (input.leadId) await this.assertLeadEligible(organizationId, input.leadId, vendorId);
 
     const id = await this.prisma.transaction(
       { actorId: principal.employeeId, reason: 'project created' },
@@ -316,9 +327,21 @@ export class ProjectsService {
             clientId: client.id,
             name: input.name,
             allocationType: input.allocationType,
-            vendorId: input.vendorId ?? null,
+            vendorId,
+            ...(input.teamId ? { teamId: input.teamId, teamAssignedById: principal.employeeId } : {}),
           },
         });
+        if (input.teamId) {
+          const synced = await syncProjectTeamStaff(tx, project.id, principal.employeeId);
+          await this.log(
+            tx,
+            principal,
+            meta,
+            'PROJECT.TEAM_ASSIGNED',
+            { type: 'Project', id: project.id },
+            { before: { teamId: null }, after: { teamId: input.teamId, staffAdded: synced.added } },
+          );
+        }
         if (input.leadId) {
           await tx.projectAssignment.create({
             data: {
@@ -341,6 +364,7 @@ export class ProjectsService {
               name: project.name,
               allocationType: project.allocationType,
               vendorId: project.vendorId,
+              teamId: input.teamId ?? null,
               leadId: input.leadId ?? null,
             },
           },
@@ -424,6 +448,66 @@ export class ProjectsService {
     }
   }
 
+  /** The team must be active, in this organization and belong to the project's vendor (or both be in-house). */
+  private async assertTeamUsable(
+    organizationId: string,
+    teamId: string,
+    projectVendorId: string | null,
+    adoptVendor = false,
+  ) {
+    const team = await this.prisma.client.team.findFirst({
+      where: { id: teamId, organizationId },
+      select: { id: true, status: true, vendorId: true },
+    });
+    if (!team) throw new ProblemException(404, 'NOT_FOUND', 'Team not found');
+    if (team.status !== 'ACTIVE') {
+      throw new ProblemException(422, 'PROJECT_STAFF_INELIGIBLE', 'This team is not active', [
+        { field: 'teamId', message: 'Choose an active team' },
+      ]);
+    }
+    if (!adoptVendor && team.vendorId !== projectVendorId) {
+      throw new ProblemException(
+        422,
+        'PROJECT_STAFF_INELIGIBLE',
+        "The team must belong to the project's vendor (or both must be in-house)",
+        [{ field: 'teamId', message: "Choose a team from the project's vendor" }],
+      );
+    }
+    return team;
+  }
+
+  /** Assigns the project's team (or clears it). The team's people become the project's staff. */
+  async setTeam(
+    principal: Principal,
+    id: string,
+    teamId: string | null,
+    meta: RequestMeta,
+  ): Promise<ProjectDetail> {
+    const project = await this.load(principal, id);
+    if (teamId) await this.assertTeamUsable(principal.organizationId, teamId, project.vendor?.id ?? null);
+    if ((project.team?.id ?? null) !== teamId) {
+      await this.prisma.transaction({ actorId: principal.employeeId, reason: 'project team' }, async (tx) => {
+        await tx.project.update({
+          where: { id },
+          data: { teamId, teamAssignedById: teamId ? principal.employeeId : null },
+        });
+        const synced = await syncProjectTeamStaff(tx, id, principal.employeeId);
+        await this.log(
+          tx,
+          principal,
+          meta,
+          'PROJECT.TEAM_ASSIGNED',
+          { type: 'Project', id },
+          {
+            before: { teamId: project.team?.id ?? null },
+            after: { teamId, staffAdded: synced.added, staffEnded: synced.ended },
+          },
+        );
+      });
+    }
+    return this.get(principal, id);
+  }
+
   async setLead(
     principal: Principal,
     id: string,
@@ -431,6 +515,13 @@ export class ProjectsService {
     meta: RequestMeta,
   ): Promise<ProjectDetail> {
     const project = await this.load(principal, id);
+    if (project.team) {
+      throw new ProblemException(
+        409,
+        'CONFLICT',
+        "This project's lead is the Team Lead of its team. Change the team's Team Lead instead.",
+      );
+    }
     if (employeeId)
       await this.assertLeadEligible(principal.organizationId, employeeId, project.vendor?.id ?? null);
     const currentLead = project.assignments.find((a) => a.projectRole === 'TEAM_LEAD');
@@ -467,7 +558,14 @@ export class ProjectsService {
     input: ProjectMemberAdd,
     meta: RequestMeta,
   ): Promise<ProjectDetail> {
-    await this.load(principal, id);
+    const project = await this.load(principal, id);
+    if (project.team && input.projectRole !== 'AUDITOR') {
+      throw new ProblemException(
+        409,
+        'CONFLICT',
+        `Coders and Group Coaches join this project through its team (${project.team.name}). Add them to the team.`,
+      );
+    }
     const employee = await this.prisma.client.employee.findFirst({
       where: { id: input.employeeId, organizationId: principal.organizationId },
       select: { role: true, status: true },
@@ -521,10 +619,17 @@ export class ProjectsService {
     await this.load(principal, id);
     const assignment = await this.prisma.client.projectAssignment.findFirst({
       where: { projectId: id, employeeId, endedAt: null, projectRole: { not: 'TEAM_LEAD' } },
-      select: { id: true, projectRole: true },
+      select: { id: true, projectRole: true, viaTeamId: true },
     });
     if (!assignment)
       throw new ProblemException(404, 'NOT_FOUND', 'This employee is not a member of the project');
+    if (assignment.viaTeamId) {
+      throw new ProblemException(
+        409,
+        'CONFLICT',
+        'This person is on the project through its team. Remove them from the team instead.',
+      );
+    }
     const open = await this.prisma.client.chartAllocation.count({
       where: { employeeId, status: 'ACTIVE', chart: { projectId: id } },
     });

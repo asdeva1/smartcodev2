@@ -461,7 +461,7 @@ function Teams() {
             <MenuItem value="INACTIVE">Inactive</MenuItem>
           </TextField>
           <Box sx={{ flex: 1 }} />
-          {manage && (
+          {manage && profile.employee.role === 'MANAGER' && (
             <Button variant="contained" onClick={() => setAdding(true)}>
               Add team
             </Button>
@@ -476,9 +476,9 @@ function Teams() {
           ) : list.data && list.data.total === 0 ? (
             <EmptyState
               title="No teams yet"
-              description="Create a team, choose its Team Lead and add the coders and auditors who work under them."
+              description="A Manager creates each team, chooses its Team Lead and adds the Coders and Group Coaches. Then assign the team to a project."
               action={
-                manage ? (
+                manage && profile.employee.role === 'MANAGER' ? (
                   <Button variant="contained" onClick={() => setAdding(true)}>
                     Add team
                   </Button>

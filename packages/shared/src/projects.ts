@@ -66,8 +66,10 @@ export const projectCreateSchema = z.object({
   allocationType: z.enum(ALLOCATION_TYPES),
   /** Optional: the vendor that executes this project. Leave out for an in-house project. */
   vendorId: uuid.optional(),
-  /** Optional Project Lead (a Team Lead). */
+  /** Optional Project Lead (a Team Lead). Older flow: prefer assigning a team. */
   leadId: uuid.optional(),
+  /** The team that works the project. Its Team Lead, Coders and Group Coaches become the project's staff. */
+  teamId: uuid.optional(),
 });
 export type ProjectCreate = z.infer<typeof projectCreateSchema>;
 
@@ -87,6 +89,10 @@ export const projectListQuerySchema = z.object({
   clientId: uuid.optional(),
 });
 export type ProjectListQuery = z.infer<typeof projectListQuerySchema>;
+
+/** Assign the project's team, or clear it with null. */
+export const projectTeamSchema = z.object({ teamId: uuid.nullable() });
+export type ProjectTeamInput = z.infer<typeof projectTeamSchema>;
 
 export const projectLeadSchema = z.object({ employeeId: uuid.nullable() });
 export type ProjectLeadInput = z.infer<typeof projectLeadSchema>;
@@ -116,6 +122,8 @@ export interface ProjectListRecord {
   allocationType: AllocationType;
   status: ProjectStatus;
   vendor: { id: string; name: string } | null;
+  /** The team that works this project; null until a Manager assigns one. */
+  team: { id: string; name: string } | null;
   lead: ProjectPerson | null;
   memberCount: number;
   chartCount: number;
@@ -128,6 +136,8 @@ export interface ProjectMemberRecord {
   fullName: string;
   email: string;
   projectRole: ProjectStaffRole;
+  /** True when the person is on the project because they are in its team. */
+  viaTeam: boolean;
   loginName: string | null;
   /** Charts the member currently holds (ALLOCATED or IN_PRODUCTION). */
   openCharts: number;
@@ -141,6 +151,11 @@ export interface ProjectDetail extends ProjectListRecord {
   chartsByStatus: Record<string, number>;
   submittedToClient: number;
   clientPullbackAt: string | null;
+  /**
+   * People staffed on the project by hand rather than through its team (Auditors are expected to be; this counts
+   * Team Lead, Coders and Group Coaches). Shown as a warning so the Manager can move them into the team.
+   */
+  legacyStaffCount: number;
 }
 
 // ───────── Project charts / allocation ─────────

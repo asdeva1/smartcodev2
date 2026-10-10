@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { TeamLeadDashboard } from '@smartcode/shared';
 import type { Principal } from '../../core/auth/principal';
+import { ProblemException } from '../../core/errors/problem';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { dayKey, monthStart, zonedDayStart } from '../projects/zoned-time';
 import { coderRows } from './coder-rows';
@@ -14,17 +15,27 @@ import { accuracy, round1 } from './manager-dashboard.service';
 export class TeamLeadDashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async dashboard(principal: Principal): Promise<TeamLeadDashboard> {
+  async dashboard(principal: Principal, requestedTeamId?: string): Promise<TeamLeadDashboard> {
     const db = this.prisma.client;
     const org = await db.organization.findUniqueOrThrow({
       where: { id: principal.organizationId },
       select: { timeZone: true },
     });
+    // A Team Lead sees the teams they lead. The Manager opens any team by id (from a project or the team list).
+    if (principal.role === 'MANAGER' && !requestedTeamId) {
+      throw new ProblemException(422, 'VALIDATION_FAILED', 'Choose a team to view.');
+    }
     const teams = await db.team.findMany({
-      where: { teamLeadId: principal.employeeId, status: 'ACTIVE' },
+      where:
+        principal.role === 'MANAGER'
+          ? { id: requestedTeamId, organizationId: principal.organizationId }
+          : { teamLeadId: principal.employeeId, status: 'ACTIVE' },
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     });
+    if (principal.role === 'MANAGER' && teams.length === 0) {
+      throw new ProblemException(404, 'NOT_FOUND', 'Team not found');
+    }
     const members = await db.teamMembership.findMany({
       where: {
         teamId: { in: teams.map((t) => t.id) },

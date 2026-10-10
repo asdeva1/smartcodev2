@@ -17,10 +17,10 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import {
   type ClientOption,
-  type EmployeeRecord,
   type Page,
   type ProjectDetail,
   type ProjectListRecord,
+  type TeamRecord,
   projectCreateSchema,
 } from '@smartcode/shared';
 import NextLink from 'next/link';
@@ -38,10 +38,10 @@ function CreateProjectDialog({ onClose }: { onClose: (createdId: string | null) 
   const [clientName, setClientName] = useState('');
   const [name, setName] = useState('');
   const [allocationType, setAllocationType] = useState<'MANUAL' | 'AUTOMATIC' | ''>('');
-  const [leadId, setLeadId] = useState('');
+  const [teamId, setTeamId] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const clients = useResource<ClientOption[]>('/projects/clients');
-  const leads = useResource<Page<EmployeeRecord>>('/employees?role=TEAM_LEAD&status=ACTIVE&pageSize=100');
+  const teams = useResource<Page<TeamRecord>>('/teams?status=ACTIVE&pageSize=100');
   const action = useAction<ProjectDetail>((project) => onClose(project.id));
 
   function submit() {
@@ -49,7 +49,7 @@ function CreateProjectDialog({ onClose }: { onClose: (createdId: string | null) 
       clientName,
       name,
       allocationType: allocationType || undefined,
-      ...(leadId ? { leadId } : {}),
+      ...(teamId ? { teamId } : {}),
     });
     if (!parsed.success) {
       const next: Record<string, string> = {};
@@ -121,15 +121,16 @@ function CreateProjectDialog({ onClose }: { onClose: (createdId: string | null) 
       <TextField
         select
         size="small"
-        label="Project lead (optional)"
-        value={leadId}
-        onChange={(e) => setLeadId(e.target.value)}
-        helperText="A Team Lead. You can set or change this later."
+        label="Team"
+        value={teamId}
+        onChange={(e) => setTeamId(e.target.value)}
+        helperText="The team that works this project. Its Team Lead, Coders and Group Coaches become the project's staff. You can set or change this later."
       >
-        <MenuItem value="">No lead yet</MenuItem>
-        {(leads.data?.items ?? []).map((l) => (
-          <MenuItem key={l.id} value={l.id}>
-            {l.fullName} ({l.email})
+        <MenuItem value="">No team yet</MenuItem>
+        {(teams.data?.items ?? []).map((t) => (
+          <MenuItem key={t.id} value={t.id}>
+            {t.name}
+            {t.vendor ? ` (${t.vendor.name})` : ''}
           </MenuItem>
         ))}
       </TextField>
@@ -229,7 +230,7 @@ function Projects() {
               title={q || type || status ? 'No projects match' : 'No projects yet'}
               description={
                 manage
-                  ? 'Create a project with its client and allocation type. Then add a lead and, for a Manual project, upload the chart allocation file.'
+                  ? 'Create a project with its client and allocation type. Then assign a team and, for a Manual project, upload the chart allocation file.'
                   : 'Projects you are staffed on appear here.'
               }
               action={
@@ -249,6 +250,7 @@ function Projects() {
                       <TableCell>Client</TableCell>
                       <TableCell>Project</TableCell>
                       <TableCell>Allocation type</TableCell>
+                      <TableCell>Team</TableCell>
                       <TableCell>Project lead</TableCell>
                       <TableCell align="right">Members</TableCell>
                       <TableCell align="right">Charts</TableCell>
@@ -276,6 +278,7 @@ function Projects() {
                         <TableCell>
                           <AllocationChip type={p.allocationType} />
                         </TableCell>
+                        <TableCell>{p.team?.name ?? 'No team yet'}</TableCell>
                         <TableCell>{p.lead?.fullName ?? '—'}</TableCell>
                         <TableCell align="right">{p.memberCount}</TableCell>
                         <TableCell align="right">{p.chartCount}</TableCell>
@@ -304,7 +307,7 @@ function Projects() {
         </Paper>
         {list.data && list.data.total > 0 && (
           <Typography variant="body2" color="text.secondary">
-            Open a project to see its lead, members, reports and live chart tracking.
+            Open a project to see its team, members, reports and live chart tracking.
           </Typography>
         )}
       </Box>

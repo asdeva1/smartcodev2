@@ -210,8 +210,8 @@ describeDb('Phase 4 — Organization, Vendors, Teams and vendor isolation (HTTP 
 
     beforeAll(async () => {
       inHouse = (await as(app, manager).post('/teams', { name: 'In-house Alpha' }).expect(201)).body;
-      teamA = (await as(app, adminA).post('/teams', { name: 'Team A1' }).expect(201)).body;
-      teamB = (await as(app, adminB).post('/teams', { name: 'Team B1' }).expect(201)).body;
+      teamA = (await as(app, manager).post('/teams', { name: 'Team A1', vendorId: vendorA.id }).expect(201)).body;
+      teamB = (await as(app, manager).post('/teams', { name: 'Team B1', vendorId: vendorB.id }).expect(201)).body;
       leadA = await createActiveEmployee(app, adminA, {
         employeeCode: 'TA-LEAD',
         fullName: 'Lead A',
@@ -232,20 +232,20 @@ describeDb('Phase 4 — Organization, Vendors, Teams and vendor isolation (HTTP 
       });
     });
 
-    it('a team belongs to the creator’s vendor, whatever the request says', async () => {
-      const own = await as(app, adminA)
+    it('only the Manager creates teams; a Vendor Admin cannot', async () => {
+      const own = await as(app, manager)
         .post('/teams', { name: 'Team A-forced', vendorId: vendorA.id })
         .expect(201);
       expect(own.body.vendor.id).toBe(vendorA.id);
-      await as(app, adminA).post('/teams', { name: 'Team Sneaky', vendorId: vendorB.id }).expect(404);
+      await as(app, adminA).post('/teams', { name: 'Team Sneaky', vendorId: vendorA.id }).expect(403);
       expect(teamA.id).toBeDefined();
       const tree = await as(app, manager).get(`/teams/${inHouse.id}`).expect(200);
       expect(tree.body.vendor).toBeNull();
     });
 
     it('team names are unique per vendor (case-insensitive) but can repeat across vendors', async () => {
-      await as(app, adminA).post('/teams', { name: 'team a1' }).expect(409);
-      await as(app, adminB).post('/teams', { name: 'Team A1' }).expect(201);
+      await as(app, manager).post('/teams', { name: 'team a1', vendorId: vendorA.id }).expect(409);
+      await as(app, manager).post('/teams', { name: 'Team A1', vendorId: vendorB.id }).expect(201);
     });
 
     it('a Vendor Admin cannot see, change or join another vendor’s teams or people', async () => {
@@ -262,7 +262,7 @@ describeDb('Phase 4 — Organization, Vendors, Teams and vendor isolation (HTTP 
     });
 
     it('adds members, moves them between teams, sets a Team Lead and removes members', async () => {
-      const second = (await as(app, adminA).post('/teams', { name: 'Team A2' }).expect(201)).body;
+      const second = (await as(app, manager).post('/teams', { name: 'Team A2', vendorId: vendorA.id }).expect(201)).body;
       await as(app, adminA).post(`/teams/${teamA.id}/members`, { employeeId: coderA.id }).expect(200);
       const lead = await as(app, adminA).patch(`/teams/${teamA.id}`, { teamLeadId: leadA.id }).expect(200);
       expect(lead.body.teamLead.id).toBe(leadA.id);

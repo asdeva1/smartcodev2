@@ -16,7 +16,13 @@ import TableRow from '@mui/material/TableRow';
 import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { type EmployeeRecord, type Page, type ProjectDetail, type ProjectStatus } from '@smartcode/shared';
+import {
+  type EmployeeRecord,
+  type Page,
+  type ProjectDetail,
+  type ProjectStatus,
+  type TeamRecord,
+} from '@smartcode/shared';
 import NextLink from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -25,6 +31,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { env } from '@/env';
 import { RequireSession, useSession } from '@/features/auth/session';
 import { apiFetch } from '@/lib/api';
+import { TeamDashboardPanel } from '../dashboards/TeamLeadWorkspace';
 import { FormDialog, useAction } from '../admin/ui';
 import { ProjectAllocation } from './ProjectAllocation';
 import { LiveTrackingPanel, ProductionReportPanel, QualityReportPanel } from './ProjectReports';
@@ -89,8 +96,49 @@ function LeadDialog({ project, onClose }: { project: ProjectDetail; onClose: (do
   );
 }
 
+function TeamDialog({ project, onClose }: { project: ProjectDetail; onClose: (done: boolean) => void }) {
+  const [teamId, setTeamId] = useState(project.team?.id ?? '');
+  const teams = useResource<Page<TeamRecord>>('/teams?status=ACTIVE&pageSize=100');
+  const action = useAction(() => onClose(true));
+  const options = (teams.data?.items ?? []).filter(
+    (t) => (t.vendor?.id ?? null) === (project.vendor?.id ?? null),
+  );
+  return (
+    <FormDialog
+      title="Project team"
+      onClose={() => onClose(false)}
+      busy={action.busy}
+      error={action.error}
+      onSubmit={() =>
+        void action.run(() =>
+          apiFetch(`/projects/${project.id}/team`, {
+            method: 'POST',
+            body: JSON.stringify({ teamId: teamId || null }),
+          }),
+        )
+      }
+    >
+      <TextField
+        select
+        size="small"
+        label="Team"
+        value={teamId}
+        onChange={(e) => setTeamId(e.target.value)}
+        helperText="The team's Team Lead, Coders and Group Coaches become the project's staff, and follow any later change to the team. Auditors are added to the project separately."
+      >
+        <MenuItem value="">No team</MenuItem>
+        {options.map((t) => (
+          <MenuItem key={t.id} value={t.id}>
+            {t.name}
+          </MenuItem>
+        ))}
+      </TextField>
+    </FormDialog>
+  );
+}
+
 function AddMemberDialog({ project, onClose }: { project: ProjectDetail; onClose: (done: boolean) => void }) {
-  const [role, setRole] = useState<'CODER' | 'AUDITOR' | 'GROUP_COACH'>('CODER');
+  const [role, setRole] = useState<'CODER' | 'AUDITOR' | 'GROUP_COACH'>(project.team ? 'AUDITOR' : 'CODER');
   const [employeeId, setEmployeeId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const people = useResource<Page<EmployeeRecord>>(`/employees?role=${role}&status=ACTIVE&pageSize=100`);
@@ -115,7 +163,9 @@ function AddMemberDialog({ project, onClose }: { project: ProjectDetail; onClose
       }}
     >
       <Typography variant="body2" color="text.secondary">
-        Coders are also added automatically when an allocation file gives them charts.
+        {project.team
+          ? `Coders and Group Coaches join through the team (${project.team.name}). Add Auditors here.`
+          : 'Coders are also added automatically when an allocation file gives them charts.'}
       </Typography>
       <TextField
         select
@@ -127,9 +177,9 @@ function AddMemberDialog({ project, onClose }: { project: ProjectDetail; onClose
           setEmployeeId('');
         }}
       >
-        <MenuItem value="CODER">Coder</MenuItem>
+        {!project.team && <MenuItem value="CODER">Coder</MenuItem>}
         <MenuItem value="AUDITOR">Auditor</MenuItem>
-        <MenuItem value="GROUP_COACH">Group Coach / SME</MenuItem>
+        {!project.team && <MenuItem value="GROUP_COACH">Group Coach / SME</MenuItem>}
       </TextField>
       <TextField
         select
@@ -163,7 +213,7 @@ function Overview({
   onChanged: () => void;
   onToast: (message: string) => void;
 }) {
-  const [dialog, setDialog] = useState<'lead' | 'member' | null>(null);
+  const [dialog, setDialog] = useState<'lead' | 'member' | 'team' | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const remove = useAction(() => {
     onToast('Member removed.');
@@ -172,6 +222,33 @@ function Overview({
 
   return (
     <Box sx={{ display: 'grid', gap: 2 }}>
+      {project.legacyStaffCount > 0 && (
+        <Alert severity="warning">
+          {project.legacyStaffCount} {project.legacyStaffCount === 1 ? 'person was' : 'people were'} added to
+          this project one by one, not through a team.
+          {project.team
+            ? ' They keep their access. Add them to the team, then remove them here, so the team controls who works this project.'
+            : ' Assign a team so the team controls who works this project.'}
+        </Alert>
+      )}
+      <Paper
+        variant="outlined"
+        sx={{ p: 2.5, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}
+      >
+        <Box>
+          <Typography variant="body2" color="text.secondary">
+            Team
+          </Typography>
+          <Typography variant="h6" component="p">
+            {project.team?.name ?? 'No team yet'}
+          </Typography>
+        </Box>
+        {manage && (
+          <Button size="small" onClick={() => setDialog('team')}>
+            {project.team ? 'Change team' : 'Assign team'}
+          </Button>
+        )}
+      </Paper>
       <Paper
         variant="outlined"
         sx={{ p: 2.5, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}
@@ -184,7 +261,7 @@ function Overview({
             {project.lead?.fullName ?? 'No lead yet'}
           </Typography>
         </Box>
-        {manage && (
+        {manage && !project.team && (
           <Button size="small" onClick={() => setDialog('lead')}>
             {project.lead ? 'Change lead' : 'Set lead'}
           </Button>
@@ -239,7 +316,14 @@ function Overview({
                     <TableCell align="right" sx={num}>
                       {m.projectRole === 'CODER' ? m.openCharts : '—'}
                     </TableCell>
-                    {manage && (
+                    {manage && m.viaTeam && (
+                      <TableCell align="right">
+                        <Typography variant="body2" color="text.secondary">
+                          From team
+                        </Typography>
+                      </TableCell>
+                    )}
+                    {manage && !m.viaTeam && (
                       <TableCell align="right">
                         <Button
                           size="small"
@@ -266,6 +350,18 @@ function Overview({
         )}
       </Paper>
 
+      {dialog === 'team' && (
+        <TeamDialog
+          project={project}
+          onClose={(done) => {
+            setDialog(null);
+            if (done) {
+              onToast('Project team updated.');
+              onChanged();
+            }
+          }}
+        />
+      )}
       {dialog === 'lead' && (
         <LeadDialog
           project={project}
@@ -294,12 +390,12 @@ function Overview({
   );
 }
 
-type TabKey = 'overview' | 'live' | 'production' | 'quality' | 'allocation';
+type TabKey = 'team' | 'overview' | 'live' | 'production' | 'quality' | 'allocation';
 
 function ProjectDetailView({ id }: { id: string }) {
   const { profile, can, signOut } = useSession();
   const project = useResource<ProjectDetail>(`/projects/${id}`);
-  const [tab, setTab] = useState<TabKey>('overview');
+  const [chosenTab, setTab] = useState<TabKey | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const p = project.data;
@@ -317,7 +413,10 @@ function ProjectDetailView({ id }: { id: string }) {
     }
   }
 
+  // The Manager opens a project on its team's dashboard.
+  const teamTab = profile.employee.role === 'MANAGER' && Boolean(p?.team);
   const tabs: { key: TabKey; label: string }[] = [
+    ...(teamTab ? [{ key: 'team' as const, label: p?.team ? `Team: ${p.team.name}` : 'Team' }] : []),
     { key: 'overview', label: 'Overview' },
     { key: 'live', label: 'Live tracking' },
     ...(can('report.read')
@@ -331,6 +430,9 @@ function ProjectDetailView({ id }: { id: string }) {
       ? [{ key: 'allocation' as const, label: 'Chart allocation' }]
       : []),
   ];
+
+  const preferred: TabKey = teamTab ? 'team' : 'overview';
+  const tab: TabKey = tabs.some((t) => t.key === chosenTab) ? (chosenTab as TabKey) : preferred;
 
   return (
     <AppShell
@@ -379,6 +481,7 @@ function ProjectDetailView({ id }: { id: string }) {
               </Box>
               {statusError && <Alert severity="error">{statusError}</Alert>}
               <Box sx={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                <Summary label="Team" value={p.team?.name ?? 'No team yet'} />
                 <Summary label="Project lead" value={p.lead?.fullName ?? '—'} />
                 <Summary label="Project members" value={p.memberCount} />
                 <Summary label="Working now" value={p.workingNow} />
@@ -393,7 +496,7 @@ function ProjectDetailView({ id }: { id: string }) {
             </Paper>
 
             <Tabs
-              value={tabs.some((t) => t.key === tab) ? tab : 'overview'}
+              value={tab}
               onChange={(_, next: TabKey) => setTab(next)}
               variant="scrollable"
               scrollButtons="auto"
@@ -404,6 +507,7 @@ function ProjectDetailView({ id }: { id: string }) {
               ))}
             </Tabs>
 
+            {tab === 'team' && p.team && <TeamDashboardPanel teamId={p.team.id} />}
             {tab === 'overview' && (
               <Overview
                 project={p}
