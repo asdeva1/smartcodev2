@@ -131,22 +131,24 @@ test('Employee activates from the emailed link, then signs in', async ({ browser
   await expect(row).not.toContainText(employee.loginName); // no Login Name is generated at activation
 });
 
-test('Manager assigns a Login Name separately from activation', async () => {
-  await manager.goto('/manager/employees?tab=login-names');
-  await manager.getByRole('textbox', { name: 'Search' }).fill(employee.email);
-  await manager.getByRole('button', { name: `Assign Login Name for ${employee.name}` }).click();
+test('Manager assigns a Login Name separately from activation (in Chart Allocation)', async () => {
+  // Login Names live in Chart Allocation, not in the Employee directory.
+  await manager.goto('/manager/allocation');
+  await manager.getByRole('button', { name: 'Assign Login Name' }).first().click();
   const dialog = manager.getByRole('dialog', { name: 'Assign Login Name' });
-  await dialog.getByLabel('SmartClues Login Name').fill(employee.loginName);
-  await dialog.getByRole('button', { name: 'Assign Login Name' }).click();
+  await dialog.getByLabel('Login Name').fill(employee.loginName);
+  await dialog.getByLabel('Email').fill(employee.email);
+  await dialog.getByRole('button', { name: 'Assign', exact: true }).click();
   await expect(dialog).toBeHidden();
-  await expect(manager.getByRole('row', { name: new RegExp(employee.name) })).toContainText(
-    employee.loginName,
+  await manager.getByRole('textbox', { name: 'Search Login Name' }).fill(employee.loginName);
+  await expect(manager.getByRole('row', { name: new RegExp(employee.loginName) })).toContainText(
+    employee.email,
   );
 
-  // Back in the directory the column shows it too.
+  // By design the Employee directory does not show Login Names.
   await manager.goto('/manager/employees');
-  await manager.getByRole('textbox', { name: 'Search' }).fill(employee.loginName);
-  await expect(manager.getByRole('row', { name: new RegExp(employee.code) })).toContainText(
+  await manager.getByRole('textbox', { name: 'Search' }).fill(employee.code);
+  await expect(manager.getByRole('row', { name: new RegExp(employee.code) })).not.toContainText(
     employee.loginName,
   );
 });
@@ -157,7 +159,7 @@ test('Employee signs in, cannot reach the directory, and a Manager deactivation 
   const context = await browser.newContext();
   const page = await context.newPage();
   await signIn(page, employee.email, EMPLOYEE_PASSWORD);
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/coder$/);
 
   await page.goto('/manager/employees');
   await expect(alertOf(page)).toContainText('do not have access');
