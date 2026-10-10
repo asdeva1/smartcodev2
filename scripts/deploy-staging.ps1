@@ -13,7 +13,7 @@ $ErrorActionPreference = "Stop"
 function Check($what) { if ($LASTEXITCODE -ne 0) { throw "FAILED: $what (exit code $LASTEXITCODE)" } }
 
 if (-not (Test-Path "apps/api/Dockerfile")) { throw "Run this from the repository root (C:\Users\ADMIN\smartcodev2)." }
-if (git status --porcelain) { throw "There are uncommitted changes. Commit or stash them first." }
+if (git status --porcelain --untracked-files=no) { throw "There are uncommitted changes. Commit or stash them first." }
 
 $p = "smartcode-staging"; $r = "ap-south-1"
 $cluster = "SmartCode-Staging-Api-ClusterEB0386A7-kui0eKwQiwwl"
