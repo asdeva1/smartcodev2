@@ -13,6 +13,7 @@ buildApp(app, {
   apiUrl: ctx('apiUrl'),
   appUrl: ctx('appUrl'),
   mailFrom: ctx('mailFrom'),
+  callsUrl: ctx('callsUrl'),
   cookieDomain: ctx('cookieDomain'),
   backupRetentionDays:
     ctx('backupRetentionDays') === undefined ? undefined : Number(ctx('backupRetentionDays')),

@@ -215,6 +215,7 @@ model Organization {
   approvalRequests ApprovalRequest[]
   visitors         Visitor[]
   visits           Visit[]
+  channels         Channel[]
   internalAuditReviews InternalAuditReview[]
   activityLogs     ActivityLog[]
   auditLogs        AuditLog[]
@@ -261,6 +262,9 @@ model Employee {
   projectAssignments     ProjectAssignment[]   @relation("ProjectAssignmentEmployee")
   projectAssignedBy      ProjectAssignment[]   @relation("ProjectAssignmentAssignedBy")
   projectsTeamAssigned   Project[]             @relation("ProjectTeamAssignedBy")
+  channelsCreated        Channel[]             @relation("ChannelCreatedBy")
+  channelMemberships     ChannelMember[]       @relation("ChannelMemberEmployee")
+  channelMessages        ChannelMessage[]      @relation("ChannelMessageAuthor")
   chartsCreated          Chart[]
   chartsSubmittedToClient Chart[]              @relation("ChartSubmittedToClientBy")
   chartStatusEvents      ChartStatusEvent[]
@@ -390,6 +394,7 @@ model Team {
   memberships  TeamMembership[]
   projects     Project[]        @relation("ProjectTeam")
   derivedAssignments ProjectAssignment[] @relation("ProjectAssignmentTeam")
+  channel      Channel?         @relation("ChannelTeam")
 
   @@index([organizationId, status])
   @@index([vendorId, status])
@@ -950,6 +955,81 @@ model Visitor {
 }
 
 /// One visit: who comes, whom they meet (the host), and when they came in and out.
+enum ChannelKind {
+  PUBLIC
+  PRIVATE
+  DIRECT
+  TEAM
+
+  @@map("channel_kind")
+}
+
+/// A chat space: a public or private channel, a direct message between two people, or a team's own channel.
+model Channel {
+  id             String      @id @default(uuid(7)) @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
+  /// Vendor boundary: NULL = in-house; otherwise only that vendor's people (and Managers) take part.
+  vendorId       String?     @map("vendor_id") @db.Uuid
+  kind           ChannelKind
+  name           String?     @db.VarChar(80)
+  topic          String?     @db.VarChar(200)
+  /// TEAM channels: the team whose members take part (membership follows the team).
+  teamId         String?     @unique @map("team_id") @db.Uuid
+  /// DIRECT channels: the two employee ids, sorted and joined with ":".
+  directKey      String?     @unique @map("direct_key") @db.VarChar(80)
+  createdById    String      @map("created_by_id") @db.Uuid
+  archivedAt     DateTime?   @map("archived_at") @db.Timestamptz(3)
+  lastMessageAt  DateTime?   @map("last_message_at") @db.Timestamptz(3)
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  team         Team?           @relation("ChannelTeam", fields: [teamId], references: [id], onDelete: Restrict)
+  createdBy    Employee        @relation("ChannelCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  members      ChannelMember[]
+  messages     ChannelMessage[]
+
+  @@index([organizationId, kind, archivedAt])
+  @@index([vendorId])
+  @@index([createdById])
+  @@map("channels")
+}
+
+model ChannelMember {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  channelId  String    @map("channel_id") @db.Uuid
+  employeeId String    @map("employee_id") @db.Uuid
+  /// OWNER can add and remove people; MEMBER can read and write.
+  isOwner    Boolean   @default(false) @map("is_owner")
+  lastReadAt DateTime? @map("last_read_at") @db.Timestamptz(3)
+  joinedAt   DateTime  @default(now()) @map("joined_at") @db.Timestamptz(3)
+
+  channel  Channel  @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  employee Employee @relation("ChannelMemberEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([channelId, employeeId])
+  @@index([employeeId])
+  @@map("channel_members")
+}
+
+model ChannelMessage {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  channelId String    @map("channel_id") @db.Uuid
+  authorId  String    @map("author_id") @db.Uuid
+  body      String    @db.VarChar(4000)
+  editedAt  DateTime? @map("edited_at") @db.Timestamptz(3)
+  /// Soft delete: the text is cleared, the row stays so the conversation keeps its order.
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  channel Channel  @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  author  Employee @relation("ChannelMessageAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([channelId, createdAt])
+  @@index([authorId])
+  @@map("channel_messages")
+}
+
 model Visit {
   id             String      @id @default(uuid(7)) @db.Uuid
   organizationId String      @map("organization_id") @db.Uuid

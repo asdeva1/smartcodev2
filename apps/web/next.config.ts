@@ -9,6 +9,22 @@ const apiOrigin = (() => {
 })();
 const isDev = process.env.NODE_ENV !== 'production';
 
+/** The call service the browser may connect to (LiveKit Cloud, or the address in NEXT_PUBLIC_CALLS_URL). */
+const callsOrigins = (() => {
+  const origins = ['https://*.livekit.cloud', 'wss://*.livekit.cloud'];
+  const configured = process.env.NEXT_PUBLIC_CALLS_URL?.trim();
+  if (configured) {
+    try {
+      const u = new URL(configured);
+      const host = u.host;
+      origins.push(`https://${host}`, `wss://${host}`);
+    } catch {
+      /* an invalid address adds nothing */
+    }
+  }
+  return origins.join(' ');
+})();
+
 /** Content Security Policy: only our own origin plus the configured API (D-06: no hard-coded domains). */
 const csp = [
   "default-src 'self'",
@@ -16,7 +32,9 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  `connect-src 'self' ${apiOrigin}${isDev ? ' ws:' : ''}`,
+  `connect-src 'self' ${apiOrigin} ${callsOrigins}${isDev ? ' ws:' : ''}`,
+  "media-src 'self' blob:",
+  "worker-src 'self' blob:",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -29,7 +47,10 @@ const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=()' },
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=()',
+  },
 ];
 
 const config: NextConfig = {

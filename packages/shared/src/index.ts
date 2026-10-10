@@ -12,6 +12,7 @@ export * from './csv.js';
 export * from './hr-integration.js';
 export * from './internal-audit.js';
 export * from './visitors.js';
+export * from './collaboration.js';
 export * from './password-policy.js';
 export * from './organization.js';
 export * from './projects.js';
