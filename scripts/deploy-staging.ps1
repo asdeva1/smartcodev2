@@ -47,6 +47,8 @@ Write-Host "== 3/7 Infrastructure (CDK)" -ForegroundColor Cyan
 Push-Location infra/cdk
 try {
   $flags = "-c","env=staging","-c","imageTag=$Tag","-c","webUrl=$web","-c","appUrl=$web","-c","mailFrom=ashok.p@smartcluestech.com","-c","backupRetentionDays=1","-c","httpsApiGateway=true"
+  $vercelUrl = "https://smartcode-v2-web-staging.vercel.app"
+  if ($web -ne $vercelUrl) { $flags += "-c","extraCorsOrigins=$vercelUrl" }  # keep the Vercel URL working during the domain move
   pnpm exec cdk deploy SmartCode-Staging-Api --exclusively --require-approval never --profile $p @flags; Check "cdk deploy"
 } finally { Pop-Location }
 

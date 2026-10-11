@@ -39,6 +39,8 @@ export interface ApiStackProps extends StackProps {
   desiredCountOverride?: number;
   /** Call service address (LiveKit), e.g. wss://your-project.livekit.cloud. Calls stay off until the keys are also stored. */
   callsUrl?: string;
+  /** Extra comma-separated web origins allowed by CORS besides the web URL (e.g. the previous host during a domain move). */
+  extraCorsOrigins?: string;
   /** Staging only: put an API Gateway HTTP API in front of the ALB to get an https API URL without a domain. */
   httpsApiGateway?: boolean;
 }
@@ -117,6 +119,7 @@ export class ApiStack extends Stack {
       MAIL_TRANSPORT: 'ses',
       ...(props.mailFrom ? { MAIL_FROM: props.mailFrom } : {}),
       ...(props.callsUrl ? { LIVEKIT_URL: props.callsUrl } : {}),
+      ...(props.extraCorsOrigins ? { CORS_ALLOWED_ORIGINS: [props.urls.web, props.extraCorsOrigins].join(',') } : {}),
       ...(props.cookieDomain ? { COOKIE_DOMAIN: props.cookieDomain } : {}),
     };
     const secrets = {

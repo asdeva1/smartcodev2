@@ -14,6 +14,7 @@ buildApp(app, {
   appUrl: ctx('appUrl'),
   mailFrom: ctx('mailFrom'),
   callsUrl: ctx('callsUrl'),
+  extraCorsOrigins: ctx('extraCorsOrigins'),
   cookieDomain: ctx('cookieDomain'),
   backupRetentionDays:
     ctx('backupRetentionDays') === undefined ? undefined : Number(ctx('backupRetentionDays')),
