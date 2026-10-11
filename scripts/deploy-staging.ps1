@@ -35,8 +35,12 @@ if (-not $SkipSnapshot) {
 
 Write-Host "== 2/7 Build and push images" -ForegroundColor Cyan
 aws ecr get-login-password --profile $p --region $r | docker login --username AWS --password-stdin $registry; Check "docker login"
-docker buildx build -f apps/api/Dockerfile --target runtime -t "${ecr}:$Tag" --push .; Check "runtime image"
-docker buildx build -f apps/api/Dockerfile --target migrator -t "${ecr}:$Tag-migrator" --push .; Check "migrator image"
+$repoName = $ecr.Split("/")[-1]
+function ImageExists($t) { aws ecr describe-images --profile $p --region $r --repository-name $repoName --image-ids imageTag=$t --query "imageDetails[0].imageDigest" --output text 2>$null | Out-Null; return ($LASTEXITCODE -eq 0) }
+if (ImageExists $Tag) { Write-Host "Image $Tag already in ECR (tags are immutable) - skipping runtime build." -ForegroundColor Yellow }
+else { docker buildx build -f apps/api/Dockerfile --target runtime -t "${ecr}:$Tag" --push .; Check "runtime image" }
+if (ImageExists "$Tag-migrator") { Write-Host "Image $Tag-migrator already in ECR - skipping migrator build." -ForegroundColor Yellow }
+else { docker buildx build -f apps/api/Dockerfile --target migrator -t "${ecr}:$Tag-migrator" --push .; Check "migrator image" }
 
 Write-Host "== 3/7 Infrastructure (CDK)" -ForegroundColor Cyan
 Push-Location infra/cdk
