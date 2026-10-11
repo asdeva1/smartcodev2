@@ -6,6 +6,7 @@
 #>
 param(
   [string]$Tag = "",
+  [string]$Web = "https://smartcode-v2-web-staging.vercel.app",
   [switch]$SkipSnapshot,
   [switch]$SkipWeb
 )
@@ -20,7 +21,7 @@ $cluster = "SmartCode-Staging-Api-ClusterEB0386A7-kui0eKwQiwwl"
 $registry = "520891536638.dkr.ecr.ap-south-1.amazonaws.com"
 $ecr = "$registry/smartcode-staging-api-apirepositoryb8378b43-uwmkykm3m9lp"
 $api = "https://cwt08exi48.execute-api.ap-south-1.amazonaws.com"
-$web = "https://smartcode-v2-web-staging.vercel.app"
+$web = $Web.TrimEnd("/")
 if (-not $Tag) { $Tag = "team-" + (git rev-parse --short HEAD) }
 Write-Host "== Deploying $(git branch --show-current) @ $(git rev-parse --short HEAD) as image tag $Tag" -ForegroundColor Cyan
 
