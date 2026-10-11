@@ -48,6 +48,10 @@ export const envSchema = z
      */
     MAIL_TRANSPORT: z.enum(['ses', 'smtp', 'file', 'memory']).default('file'),
     MAIL_FROM: optionalString,
+    /** Audio/video calls and screen sharing (LiveKit). All three set = calls on; none = chat only. */
+    LIVEKIT_URL: optionalString,
+    LIVEKIT_KEY_ID: optionalString,
+    LIVEKIT_SIGNING_KEY: optionalString,
     SMTP_HOST: optionalString,
     SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(1025),
     MAIL_FILE_DIR: optionalString,

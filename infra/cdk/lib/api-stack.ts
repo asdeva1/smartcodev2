@@ -37,6 +37,10 @@ export interface ApiStackProps extends StackProps {
   cookieDomain?: string;
   /** First-deploy escape hatch: 0 creates the service before an image exists in ECR. */
   desiredCountOverride?: number;
+  /** Call service address (LiveKit), e.g. wss://your-project.livekit.cloud. Calls stay off until the keys are also stored. */
+  callsUrl?: string;
+  /** Extra comma-separated web origins allowed by CORS besides the web URL (e.g. the previous host during a domain move). */
+  extraCorsOrigins?: string;
   /** Staging only: put an API Gateway HTTP API in front of the ALB to get an https API URL without a domain. */
   httpsApiGateway?: boolean;
 }
@@ -50,6 +54,7 @@ export class ApiStack extends Stack {
   readonly service: ecsPatterns.ApplicationLoadBalancedFargateService;
   readonly repository: ecr.Repository;
   readonly appSecret: secretsmanager.Secret;
+  readonly callsSecret: secretsmanager.Secret;
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
@@ -72,6 +77,15 @@ export class ApiStack extends Stack {
           JWT_PRIVATE_KEY: '',
           JWT_PUBLIC_KEY: '',
         }),
+        generateStringKey: 'UNUSED_GENERATED',
+      },
+    });
+
+    // Call service keys (LiveKit API key and secret). Empty until the runbook stores them; empty = calls switched off.
+    this.callsSecret = new secretsmanager.Secret(this, 'CallsSecret', {
+      description: `SmartCode ${config.name} call service keys (LIVEKIT_KEY_ID, LIVEKIT_SIGNING_KEY) - populated via runbook`,
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({ LIVEKIT_KEY_ID: '', LIVEKIT_SIGNING_KEY: '' }),
         generateStringKey: 'UNUSED_GENERATED',
       },
     });
@@ -104,12 +118,16 @@ export class ApiStack extends Stack {
       S3_REPORTS_BUCKET: props.reports.bucketName,
       MAIL_TRANSPORT: 'ses',
       ...(props.mailFrom ? { MAIL_FROM: props.mailFrom } : {}),
+      ...(props.callsUrl ? { LIVEKIT_URL: props.callsUrl } : {}),
+      ...(props.extraCorsOrigins ? { CORS_ALLOWED_ORIGINS: [props.urls.web, props.extraCorsOrigins].join(',') } : {}),
       ...(props.cookieDomain ? { COOKIE_DOMAIN: props.cookieDomain } : {}),
     };
     const secrets = {
       DATABASE_URL: ecs.Secret.fromSecretsManager(this.appSecret, 'DATABASE_URL'),
       JWT_PRIVATE_KEY: ecs.Secret.fromSecretsManager(this.appSecret, 'JWT_PRIVATE_KEY'),
       JWT_PUBLIC_KEY: ecs.Secret.fromSecretsManager(this.appSecret, 'JWT_PUBLIC_KEY'),
+      LIVEKIT_KEY_ID: ecs.Secret.fromSecretsManager(this.callsSecret, 'LIVEKIT_KEY_ID'),
+      LIVEKIT_SIGNING_KEY: ecs.Secret.fromSecretsManager(this.callsSecret, 'LIVEKIT_SIGNING_KEY'),
     };
 
     const certificate = props.certificateArn
@@ -287,6 +305,7 @@ export class ApiStack extends Stack {
     new CfnOutput(this, 'MigrateTaskDefinitionArn', { value: migrate.taskDefinitionArn });
     new CfnOutput(this, 'BootstrapTaskDefinitionArn', { value: bootstrap.taskDefinitionArn });
     new CfnOutput(this, 'AppSecretArn', { value: this.appSecret.secretArn });
+    new CfnOutput(this, 'CallsSecretArn', { value: this.callsSecret.secretArn });
   }
 }
 

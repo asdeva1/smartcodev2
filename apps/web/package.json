@@ -26,6 +26,7 @@
     "@mui/material-nextjs": "^9.4.0",
     "@smartcode/brand": "workspace:*",
     "@smartcode/shared": "workspace:*",
+    "livekit-client": "2.22.3",
     "next": "^16.4.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

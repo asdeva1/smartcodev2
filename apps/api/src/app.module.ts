@@ -20,6 +20,7 @@ import { DashboardsModule } from './modules/dashboards/dashboards.module';
 import { LogsModule } from './modules/logs/logs.module';
 import { ApprovalsModule } from './modules/approvals/approvals.module';
 import { InternalAuditModule } from './modules/internal-audit/internal-audit.module';
+import { CollaborationModule } from './modules/collaboration/collaboration.module';
 import { VisitorsModule } from './modules/visitors/visitors.module';
 import { HrIntegrationModule } from './modules/hr-integration/hr-integration.module';
 import { ProductionModule } from './modules/production/production.module';
@@ -63,6 +64,7 @@ export class AppModule {
         ApprovalsModule,
         HrIntegrationModule,
         VisitorsModule,
+        CollaborationModule,
         InternalAuditModule,
         AuditsModule,
       ],

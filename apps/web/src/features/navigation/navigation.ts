@@ -27,6 +27,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     available: true,
   },
   {
+    key: 'messages',
+    label: 'Messages',
+    href: '/messages',
+    permission: 'notification.read',
+    group: 'Overview',
+    available: true,
+  },
+  {
     key: 'vendor-dashboard',
     label: 'Vendor dashboard',
     href: '/vendor',

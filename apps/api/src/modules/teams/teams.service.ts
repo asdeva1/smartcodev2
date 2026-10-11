@@ -17,6 +17,7 @@ import { ProblemException } from '../../core/errors/problem';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import type { Prisma } from '../../generated/prisma/client';
 import { isUniqueViolation, logEntityChange } from '../organization/entity-log';
+import { syncTeamProjects } from '../projects/project-team-sync';
 
 const TEAM_INCLUDE = {
   vendor: { select: { id: true, name: true } },
@@ -155,17 +156,12 @@ export class TeamsService {
   // ───────── create / update ─────────
 
   async create(principal: Principal, input: TeamCreate, meta: RequestMeta): Promise<TeamDetail> {
-    const scope = this.scopeOf(principal, 'team.manage');
-    let vendorId: string | null;
-    if (scope === 'VENDOR') {
-      if (!principal.vendorId)
-        throw new ProblemException(403, 'FORBIDDEN', 'You do not have permission to perform this action');
-      if (input.vendorId && input.vendorId !== principal.vendorId)
-        throw new ProblemException(404, 'NOT_FOUND', 'Vendor not found');
-      vendorId = principal.vendorId;
-    } else {
-      vendorId = input.vendorId ?? null;
+    this.scopeOf(principal, 'team.manage');
+    // Every team is created by the Manager; a Vendor Admin works with the teams the Manager made for the vendor.
+    if (principal.role !== 'MANAGER') {
+      throw new ProblemException(403, 'FORBIDDEN', 'Only the Manager can create a team');
     }
+    const vendorId: string | null = input.vendorId ?? null;
     if (vendorId) {
       const vendor = await this.prisma.client.vendor.findFirst({
         where: { id: vendorId, organizationId: principal.organizationId },
@@ -241,6 +237,7 @@ export class TeamsService {
             },
           },
         );
+        if (input.teamLeadId !== undefined) await syncTeamProjects(tx, id, principal.employeeId);
       });
     } catch (error) {
       if (isUniqueViolation(error)) throw this.conflict('name', 'A team with this name already exists here');
@@ -254,6 +251,14 @@ export class TeamsService {
   async deactivate(principal: Principal, id: string, meta: RequestMeta): Promise<TeamDetail> {
     const current = await this.loadManaged(principal, id);
     if (current.status === 'INACTIVE') return this.get(principal, id);
+    const projects = await this.prisma.client.project.count({ where: { teamId: id, status: 'ACTIVE' } });
+    if (projects > 0) {
+      throw new ProblemException(
+        409,
+        'CONFLICT',
+        `This team works ${projects} active project${projects === 1 ? '' : 's'}. Give those projects another team first.`,
+      );
+    }
     if (current._count.memberships > 0) {
       throw new ProblemException(
         409,
@@ -343,6 +348,8 @@ export class TeamsService {
             after: { employeeId, movedFromTeamId: current?.teamId ?? null },
           },
         );
+        if (current) await syncTeamProjects(tx, current.teamId, principal.employeeId);
+        await syncTeamProjects(tx, id, principal.employeeId);
       },
     );
     return this.get(principal, id);
@@ -375,6 +382,7 @@ export class TeamsService {
             after: { employeeId },
           },
         );
+        await syncTeamProjects(tx, id, principal.employeeId);
       },
     );
     return this.get(principal, id);

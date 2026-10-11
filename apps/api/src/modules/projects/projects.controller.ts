@@ -20,6 +20,7 @@ import {
   type ProjectChartsQuery,
   type ProjectCreate,
   type ProjectLeadInput,
+  type ProjectTeamInput,
   type ProjectListQuery,
   type ProjectMemberAdd,
   type ProjectUpdate,
@@ -34,6 +35,7 @@ import {
   projectChartsQuerySchema,
   projectCreateSchema,
   projectLeadSchema,
+  projectTeamSchema,
   projectListQuerySchema,
   projectMemberAddSchema,
   projectUpdateSchema,
@@ -108,6 +110,19 @@ export class ProjectsController {
   }
 
   // ───── staffing ─────
+
+  /** Assign the project's team (null clears it). The team's Team Lead, Coders and Group Coaches become the staff. */
+  @Post(':id/team')
+  @RequirePermission('project.assignStaff')
+  @HttpCode(200)
+  setTeam(
+    @CurrentPrincipal() p: Principal,
+    @Param('id', new UuidParamPipe()) id: string,
+    @Body(new ZodValidationPipe(projectTeamSchema)) body: ProjectTeamInput,
+    @Meta() meta: RequestMeta,
+  ) {
+    return this.projects.setTeam(p, id, body.teamId, meta);
+  }
 
   @Post(':id/lead')
   @RequirePermission('project.assignStaff')

@@ -10,6 +10,7 @@ import { TeamLeadDashboardService } from './team-lead-dashboard.service';
 import { VendorDashboardService } from './vendor-dashboard.service';
 
 const vendorDashboardQuerySchema = z.object({ vendorId: z.string().uuid().optional() });
+const teamDashboardQuerySchema = z.object({ teamId: z.string().uuid().optional() });
 
 @Controller('dashboards')
 export class DashboardsController {
@@ -43,8 +44,11 @@ export class DashboardsController {
   /** The teams the caller leads: totals, pending audit/review/rework and a row per coder. */
   @Get('team-lead')
   @RequirePermission('dashboard.teamLead')
-  teamLeadDashboard(@CurrentPrincipal() p: Principal) {
-    return this.teamLead.dashboard(p);
+  teamLeadDashboard(
+    @CurrentPrincipal() p: Principal,
+    @Query(new ZodValidationPipe(teamDashboardQuerySchema)) q: { teamId?: string },
+  ) {
+    return this.teamLead.dashboard(p, q.teamId);
   }
 
   /** Audit quality across the projects the caller (Quality Coach / SME) is staffed on. */

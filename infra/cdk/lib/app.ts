@@ -14,6 +14,8 @@ export interface BuildOptions {
   apiUrl?: string;
   appUrl?: string;
   mailFrom?: string;
+  callsUrl?: string;
+  extraCorsOrigins?: string;
   cookieDomain?: string;
   desiredCount?: number;
   /** Staging only: new AWS accounts on the free plan cap RDS backups at 1 day. Rejected for production. */
@@ -51,6 +53,8 @@ export function buildApp(app: App, options: BuildOptions) {
     certificateArn: options.certificateArn,
     imageTag: options.imageTag ?? 'unset',
     mailFrom: options.mailFrom,
+    callsUrl: options.callsUrl,
+    extraCorsOrigins: options.extraCorsOrigins,
     cookieDomain: options.cookieDomain,
     desiredCountOverride: options.desiredCount,
     httpsApiGateway: options.httpsApiGateway,
